@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>韩行风 · 笔耕不辍</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- GitHub Markdown 样式 (用于渲染文章) -->
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/github-markdown-css/github-markdown.min.css">
+
+    <!-- highlight.js 主题 (代码高亮) -->
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/highlight.js/styles/github.min.css">
+
+    <style>
+        body {
+            background-color: #f9fafb;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+        }
+
+        /* 背景图容器：占屏幕 1/3 */
+        .hero-section {
+            height: 66vh;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* GitHub 风格热力图格子 */
+        .contribution-grid {
+            display: grid;
+            grid-template-rows: repeat(7, 1fr);
+            grid-auto-flow: column;
+            gap: 3px;
+        }
+
+        .square {
+            width: 11px;
+            height: 11px;
+            border-radius: 2px;
+            background-color: #ebedf0;
+            transition: transform 0.2s;
+        }
+
+        .square:hover {
+            transform: scale(1.3);
+            border: 1px solid #999;
+        }
+
+        /* 颜色阶梯：根据字数深浅 */
+        .level-0 { background-color: #ebedf0; }
+        .level-1 { background-color: #9be9a8; }
+        .level-2 { background-color: #40c463; }
+        .level-3 { background-color: #30a14e; }
+        .level-4 { background-color: #216e39; }
+
+        /* 动画 */
+        .fade-in {
+            animation: fadeIn 0.35s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /*
+           markdown-body 样式微调，让它与原有设计融合
+           同时保留文章内容的阅读舒适度
+        */
+        .markdown-body {
+            background: transparent;
+            padding: 0 !important;
+            font-size: 16px;
+            line-height: 1.75;
+            color: #1f2937;
+        }
+
+        .markdown-body pre {
+            background: #111827;
+            border-radius: 12px;
+            margin: 1.2em 0;
+        }
+
+        .markdown-body code {
+            font-family: Consolas, 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        /* 文章容器样式 */
+        .article-wrapper {
+            background: white;
+            border-radius: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            border: 1px solid #f0f0f0;
+        }
+
+        /* 多行省略工具类 (line-clamp) */
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .line-clamp-3 {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+
+<!-- 顶部 -->
+<header class="relative">
+    <div class="hero-section">
+        <img src="images/背景.png" alt="背景" class="hero-image">
+    </div>
+
+    <!-- 右上角个人信息 -->
+    <div class="absolute top-6 right-8 flex items-center space-x-3 bg-white/50 backdrop-blur-md p-2 rounded-full px-4 border border-white/30 shadow-sm">
+        <span class="font-medium text-gray-800">韩行风</span>
+        <img src="images/头像.jpg" alt="头像" class="w-8 h-8 rounded-full border-2 border-white object-cover">
+    </div>
+</header>
+
+<!-- 主体 -->
+<main class="max-w-4xl mx-auto -mt-12 relative z-10 px-4">
+
+    <!-- 首页顶部统计 -->
+    <div id="home-header" class="flex flex-col md:flex-row gap-8 items-start">
+
+        <!-- 左侧统计 -->
+        <div class="w-full md:w-1/3 bg-white p-6 rounded-2xl shadow-xl border border-gray-100">
+            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">
+                Yesterday's Growth
+            </h3>
+            <div class="space-y-6">
+                <div>
+                    <p class="text-3xl font-light text-gray-800" id="yesterday-count">0</p>
+                    <p class="text-sm text-gray-500">新增笔记 (篇)</p>
+                </div>
+                <div>
+                    <p class="text-3xl font-light text-blue-600" id="yesterday-words">0</p>
+                    <p class="text-sm text-gray-500">新增字数 (字)</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 热力图 -->
+        <div class="w-full md:w-2/3 bg-white p-6 rounded-2xl shadow-xl border border-gray-100">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Writing Activity</h3>
+                <p class="text-xs text-gray-500">笔耕不辍，岁序更新</p>
+                <span class="text-xs text-gray-400" id="start-date-label">From 2026-05-09</span>
+            </div>
+            <div class="overflow-x-auto pb-2">
+                <div class="contribution-grid" id="heatmap"></div>
+            </div>
+            <div class="flex items-center justify-end mt-2 space-x-1 text-[10px] text-gray-400">
+                <span>Less</span>
+                <div class="square level-0"></div>
+                <div class="square level-1"></div>
+                <div class="square level-2"></div>
+                <div class="square level-3"></div>
+                <div class="square level-4"></div>
+                <span>More</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 动态内容区域：文章列表 / 详情 -->
+    <div id="main-content" class="fade-in mt-8"></div>
+
+    <!-- 分页控件（仅列表页） -->
+    <div id="pagination" class="mt-10 flex justify-center space-x-4 hidden">
+        <button onclick="changePage(-1)" class="px-4 py-2 bg-white rounded-lg shadow-sm border text-sm hover:bg-gray-50 transition">上一页</button>
+        <span id="page-info" class="self-center text-sm text-gray-500">第 1 页</span>
+        <button onclick="changePage(1)" class="px-4 py-2 bg-white rounded-lg shadow-sm border text-sm hover:bg-gray-50 transition">下一页</button>
+    </div>
+
+</main>
+
+<!-- 引入 markdown-it (渲染 Markdown) -->
+<script src="https://cdn.jsdelivr.net/npm/markdown-it/dist/markdown-it.min.js"></script>
+<!-- highlight.js 核心库 -->
+<script src="https://cdn.jsdelivr.net/npm/highlight.js/lib/common.min.js"></script>
+
+<script>
+    // =========================
+    // 1. 初始化 markdown-it 渲染器（完全复用 post.html 的逻辑）
+    // =========================
+    const md = window.markdownit({
+        html: false,          // 禁止 HTML 标签注入，提高安全性
+        linkify: true,       // 自动识别 URL 并转为链接
+        typographer: true,   // 增强排版（例如 -> 转化为 →）
+        highlight: function (str, lang) {
+            if (lang && hljs.getLanguage(lang)) {
+                try {
+                    return hljs.highlight(str, { language: lang }).value;
+                } catch (__) {}
+            }
+            return ''; // 无匹配语言时返回空，后续也会被 pre code 包裹
+        }
+    });
+
+    // =========================
+    // 全局变量 & API 地址
+    // =========================
+    let currentPage = 1;
+    let totalPages = 1;
+    const API_BASE = "http://localhost:8080";
+
+    // =========================
+    // 辅助方法：渲染 Markdown 内容，并高亮代码块
+    // =========================
+    function renderMarkdownToHtml(markdownText) {
+        if (!markdownText) return '<p class="text-gray-400 text-center">暂无内容</p>';
+        // 使用 markdown-it 转换
+        let renderedHtml = md.render(markdownText);
+        // 创建一个临时容器用于再次确保代码高亮
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = renderedHtml;
+        wrapper.querySelectorAll('pre code').forEach((block) => {
+            hljs.highlightElement(block);
+        });
+        return wrapper.innerHTML;
+    }
+
+    // =========================
+    // 初始化：判断列表页 or 详情页
+    // =========================
+    function init() {
+        const params = new URLSearchParams(window.location.search);
+        const articleId = params.get("id");
+        if (articleId) {
+            renderDetailView(articleId);
+        } else {
+            renderHomeView();
+        }
+    }
+
+    // =========================
+    // 首页视图 (列表 + 统计)
+    // =========================
+    async function renderHomeView() {
+        document.getElementById("home-header").classList.remove("hidden");
+        document.getElementById("pagination").classList.remove("hidden");
+        await loadStats();
+        await fetchArticles(currentPage);
+    }
+
+    // =========================
+    // 获取文章列表（卡片模式 - 与 admin.html 样式一致，展示 preview 替换日期和 ID 区域）
+    // 组件大小完全相同：背景白、圆角xl、边框、内边距p-5、悬浮阴影
+    // 每个卡片展示标题 + 摘要（preview），完全替换原admin卡片中的日期+ID行
+    // =========================
+    async function fetchArticles(page) {
+        try {
+            const res = await fetch(`${API_BASE}/blog/getBriefWritings?current=${page}`);
+            const result = await res.json();
+            if (result.code === 1) {
+                const container = document.getElementById("main-content");
+                const list = result.data.records || [];
+                totalPages = result.data.pages || 1;
+
+                // 采用单列布局，每个卡片与 admin 后台样式一致（无删除按钮，但保留点击跳转）
+                let html = `<div class="grid grid-cols-1 gap-3">`;
+                list.forEach(item => {
+                    // 优先使用 preview 字段作为摘要，兼容旧的 summary 字段
+                    const previewText = (item.preview || item.summary || "").trim();
+                    const displayPreview = previewText ? escapeHtml(previewText) : "✨ 这篇文章暂无摘要，点击阅读全文。";
+
+                    html += `
+                        <div onclick="goToDetail(${item.id})"
+                             class="bg-white rounded-xl border border-gray-100 p-5 hover:shadow-md transition-all cursor-pointer group">
+                            <h3 class="text-base font-medium text-gray-800 group-hover:text-blue-600 transition-colors">
+                                ${escapeHtml(item.title) || "无标题"}
+                            </h3>
+                            <div class="text-xs text-gray-500 mt-1.5 leading-relaxed line-clamp-2">
+                                ${displayPreview}
+                            </div>
+                            <!-- 原admin卡片中日期+ID区域完全被 preview 替代，不再显示日期和ID，严格符合需求 -->
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+
+                // 若列表为空
+                if (list.length === 0) {
+                    html = `<div class="text-center text-gray-400 py-16 bg-white rounded-2xl border">暂无文章，静待更新</div>`;
+                }
+                container.innerHTML = html;
+                document.getElementById("page-info").innerText = `第 ${result.data.current} / ${result.data.pages} 页`;
+            } else {
+                throw new Error("接口返回失败");
+            }
+        } catch (e) {
+            console.error(e);
+            document.getElementById("main-content").innerHTML = `<div class="text-center text-gray-400 py-20 bg-white rounded-2xl p-10">文章列表加载失败，请稍后重试</div>`;
+        }
+    }
+
+    // =========================
+    // 详情页视图 —— 使用 Markdown 渲染逻辑（保留完整文章展示）
+    // =========================
+    async function renderDetailView(id) {
+        // 隐藏首页专属区块
+        document.getElementById("home-header").classList.add("hidden");
+        document.getElementById("pagination").classList.add("hidden");
+
+        try {
+            const res = await fetch(`${API_BASE}/blog/getOne/${id}`);
+            const result = await res.json();
+            if (result.code === 1) {
+                const article = result.data;
+                // 文章原始内容（Markdown 原文）
+                const rawMarkdown = article.content || "";
+
+                // 通过 markdown-it 渲染 markdown
+                const renderedHtml = renderMarkdownToHtml(rawMarkdown);
+
+                // 构建详情页布局，使用 .markdown-body 样式容器
+                const detailHtml = `
+                    <div class="article-wrapper bg-white p-10 rounded-3xl shadow-sm border border-gray-50 min-h-[500px]">
+                        <button onclick="window.location.href='?page=home'"
+                                class="text-xs text-gray-400 hover:text-gray-800 mb-8 flex items-center transition">
+                            ← 返回起始页
+                        </button>
+                        <h1 class="text-4xl font-bold text-gray-900 mb-4">
+                            ${escapeHtml(article.title) || "无标题"}
+                        </h1>
+                        <div class="text-sm text-gray-400 mb-10 pb-6 border-b border-gray-50">
+                            发布于 ${article.date || article.createTime || "未知时间"}
+                        </div>
+                        <div class="markdown-body">
+                            ${renderedHtml}
+                        </div>
+                    </div>
+                `;
+
+                document.getElementById("main-content").innerHTML = detailHtml;
+
+                // 二次安全加强：新插入的代码块再手动高亮一次
+                document.querySelectorAll('.markdown-body pre code').forEach((block) => {
+                    hljs.highlightElement(block);
+                });
+            } else {
+                throw new Error("文章不存在或加载失败");
+            }
+        } catch (e) {
+            console.error(e);
+            document.getElementById("main-content").innerHTML = `
+                <div class="text-center text-gray-400 py-20 bg-white rounded-2xl p-10">
+                    文章加载失败，请稍后重试
+                </div>
+            `;
+        }
+    }
+
+    // =========================
+    // 跳转详情 (保留原 ID 参数)
+    // =========================
+    function goToDetail(id) {
+        window.location.href = `?id=${id}`;
+    }
+
+    // =========================
+    // 分页控制
+    // =========================
+    function changePage(delta) {
+        const nextPage = currentPage + delta;
+        if (nextPage < 1 || nextPage > totalPages) return;
+        currentPage = nextPage;
+        fetchArticles(currentPage);
+        window.scrollTo({ top: 400, behavior: "smooth" });
+    }
+
+    // =========================
+    // 加载统计数据 + 热力图（保持原样）
+    // =========================
+    async function loadStats() {
+        try {
+            const resNow = await fetch(`${API_BASE}/blog/selectNow`);
+            const nowResult = await resNow.json();
+            if (nowResult.code === 1) {
+                document.getElementById("yesterday-count").innerText = nowResult.data.dailyNoteCount || 0;
+                document.getElementById("yesterday-words").innerText = nowResult.data.dailyNoteWordCount || 0;
+            }
+            const resList = await fetch(`${API_BASE}/blog/select`);
+            const listResult = await resList.json();
+            if (listResult.code === 1) {
+                renderHeatmap(listResult.data || []);
+            } else {
+                renderHeatmap(generateMockData());
+            }
+        } catch (error) {
+            console.error("数据加载失败:", error);
+            renderHeatmap(generateMockData());
+        }
+    }
+
+    // 热力图渲染
+    function renderHeatmap(dataList) {
+        const heatmap = document.getElementById("heatmap");
+        heatmap.innerHTML = "";
+        const daysToShow = 365;
+        const startDate = new Date("2026-05-09");
+        const dataMap = new Map();
+        if (dataList && Array.isArray(dataList)) {
+            dataList.forEach(item => {
+                if (item.todayTime) dataMap.set(item.todayTime, item.dailyNoteWordCount);
+            });
+        }
+        for (let i = 0; i < daysToShow; i++) {
+            const currentDate = new Date(startDate);
+            currentDate.setDate(startDate.getDate() + i);
+            const dateStr = currentDate.toLocaleDateString("sv-SE");
+            const wordCount = dataMap.get(dateStr) || 0;
+            const level = getLevel(wordCount);
+            const square = document.createElement("div");
+            square.className = `square level-${level}`;
+            square.title = `${dateStr}: ${wordCount} 字`;
+            heatmap.appendChild(square);
+        }
+    }
+
+    function getLevel(count) {
+        if (count <= 0) return 0;
+        if (count < 500) return 1;
+        if (count < 1500) return 2;
+        if (count < 3000) return 3;
+        return 4;
+    }
+
+    function generateMockData() {
+        return [
+            { todayTime: "2026-05-09", dailyNoteWordCount: 800 },
+            { todayTime: "2026-05-10", dailyNoteWordCount: 2000 },
+            { todayTime: "2026-05-12", dailyNoteWordCount: 4500 }
+        ];
+    }
+
+    // 简单的防 XSS 辅助函数（用于标题、摘要等）
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
+            return c;
+        });
+    }
+
+    // 启动
+    init();
+</script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+HELP.md
+target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+
+### Sensitive config ###
+src/main/resources/application.yaml
+
+### Personal images ###
+src/main/resources/images/
+src/main/resources/static/images/头像.jpg
+src/main/resources/static/images/登录页背景.jpg
+
+### Personal notes (not source code) ###
+src/main/resources/zip/
+
+### Backup and temp files ###
+**/*备份*
+src/main/resources/static/test.html
