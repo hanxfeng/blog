@@ -1,6 +1,8 @@
 package org.hanxingfeng.blog.Controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.hanxingfeng.blog.Entity.R;
@@ -14,6 +16,7 @@ import org.hanxingfeng.blog.Service.SummaryWritingService;
 import org.hanxingfeng.blog.other.UpdateNowData;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
@@ -24,6 +27,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.ToDoubleBiFunction;
 
 @Slf4j
 @RestController
@@ -37,7 +41,7 @@ public class userController {
     private WritingsMapper writingsMapper;
 
     @Autowired
-    private RedisTemplate<String, String> redisTemplate;
+    private StringRedisTemplate redisTemplate;
 
     @Autowired
     private SummaryWritingService summaryWritingService;
@@ -48,10 +52,14 @@ public class userController {
     @Autowired
     private UserMapper userMapper;
 
+    @Autowired
+    private ObjectMapper objectMapper;
+
 
     /**
      * 用于进行登录
      */
+    // TODO:完善登录功能
     @PostMapping("/login")
     public R<String> login(HttpServletRequest request, @RequestBody User user) {
         log.info("开始进行登录校验");
@@ -155,8 +163,10 @@ public class userController {
                 return R.error(e.getMessage());
             }
 
-            // TODO:将部分数据保存至 Redis
-
+            // 将数据保存至 Redis
+            String key = "Writing" + writings.getId().toString();
+            String stringData = objectMapper.writeValueAsString(writings);
+            redisTemplate.opsForValue().set(key, stringData);
 
             return R.success("上传成功");
 
@@ -172,7 +182,14 @@ public class userController {
     @GetMapping("/delete/{id}")
     public R<String> delete(@PathVariable Long id) {
         log.info("开始删除文章，id为：{}",id);
+
+        // 在数据库中删除
         summaryWritingService.deleteWriting(id);
+
+        // 在 Redis 中删除
+        String key = "Writing" + id.toString();
+        redisTemplate.delete(key);
+
         return R.success("删除成功");
     }
 
@@ -186,9 +203,15 @@ public class userController {
         return R.success("服务器正常运行");
     }
 
+    /**
+     * 对文章内容进行修改
+     * @param writings
+     * @return
+     * @throws JsonProcessingException
+     */
     @Transactional
     @PostMapping("/updateWritingById")
-    public R<String> updateWritingById(@RequestBody Writings writings) {
+    public R<String> updateWritingById(@RequestBody Writings writings) throws JsonProcessingException {
         log.info("开始对文章进行修改");
 
         // 更新文章摘要
@@ -209,6 +232,13 @@ public class userController {
 
         writingsMapper.updateById(writings);
         summaryWritingMapper.updateById(summaryWriting);
+
+        // 更新在 Redis 中的数据
+        String key = "Writing" + writings.getId().toString();
+        String rStringData = objectMapper.writeValueAsString(writings);
+        redisTemplate.opsForValue().set(key, rStringData);
+
+
 
         return R.success("修改成功");
     }

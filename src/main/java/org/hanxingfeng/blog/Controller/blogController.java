@@ -2,6 +2,7 @@ package org.hanxingfeng.blog.Controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.*;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import static org.hanxingfeng.blog.Entity.SystemConstants.START_TIME;
 
@@ -107,7 +109,7 @@ public class blogController {
                         redisData, new TypeReference<>() {
                         }
                 );
-
+                log.info("Redis 中获取历史笔记数据");
                 return R.success(re);
             } catch (Exception e) {
                 log.info("缓存数据损坏");
@@ -117,6 +119,7 @@ public class blogController {
             LambdaQueryWrapper<NodeCount> lqw = new LambdaQueryWrapper<>();
             lqw.ge(NodeCount::getTodayTime, START_TIME);
             List<NodeCount> re = blogMapper.selectList(lqw);
+            log.info("MySQL 中获取历史笔记数据");
             return R.success(re);
         }
 
@@ -137,19 +140,47 @@ public class blogController {
      * 获取所有文章摘要
      */
     @GetMapping("/getBriefWritings")
-    public R<Page<SummaryWriting>> getBriefWritings (@RequestParam(defaultValue = "1") int current) {
+    public R<Page<SummaryWriting>> getBriefWritings (@RequestParam(defaultValue = "1") int current) throws JsonProcessingException {
         log.info("开始获取文章摘要");
-        Page<SummaryWriting> page = new Page<>(current, 9);
-        Page<SummaryWriting> resultPage = summaryWritingMapper.selectPage(page, null);
-        return R.success(resultPage);
+
+        // 尝试从 Redis 中获取数据
+        String key = "PageSummaryWriting:current=" + current + "size:9";
+        String data = redisTemplate.opsForValue().get(key);
+
+        if (data != null) {
+            log.info("使用 Redis 数据获取文章摘要");
+            Page resultPage = objectMapper.readValue(data, Page.class);
+            return R.success(resultPage);
+        }
+        else {
+            log.info("使用 MySQL 数据获取文章摘要");
+            Page<SummaryWriting> page = new Page<>(current, 9);
+            Page<SummaryWriting> resultPage = summaryWritingMapper.selectPage(page, null);
+
+            // 添加缓存
+            String redisData = objectMapper.writeValueAsString(resultPage);
+            redisTemplate.opsForValue().set(key, redisData, 30, TimeUnit.MINUTES);
+            return R.success(resultPage);
+        }
     }
 
     /**
      * 获取指定文章
      */
     @GetMapping("/getOne/{id}")
-    public R<Writings> getOne(@PathVariable Long id) {
+    public R<Writings> getOne(@PathVariable Long id) throws JsonProcessingException {
         log.info("获取id为：{}的文章",id);
-        return R.success(writingsMapper.selectById(id));
+        String writing = redisTemplate.opsForValue().get("Writing" + id.toString());
+        // 如果 Redis 中不存在数据，则从数据库中查询并写入 Redis
+        Writings rWriting;
+        if (writing == null) {
+            rWriting = writingsMapper.selectById(id);
+            String stringWriting = objectMapper.writeValueAsString(rWriting);
+            redisTemplate.opsForValue().set("Writing" + id.toString(), stringWriting);
+        }
+        else {
+            rWriting = objectMapper.readValue(writing, Writings.class);
+        }
+        return R.success(rWriting);
     }
 }
