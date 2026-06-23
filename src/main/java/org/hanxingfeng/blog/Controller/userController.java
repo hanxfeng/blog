@@ -13,6 +13,7 @@ import org.hanxingfeng.blog.Mapper.SummaryWritingMapper;
 import org.hanxingfeng.blog.Mapper.UserMapper;
 import org.hanxingfeng.blog.Mapper.WritingsMapper;
 import org.hanxingfeng.blog.Service.SummaryWritingService;
+import org.hanxingfeng.blog.other.JWTUtil;
 import org.hanxingfeng.blog.other.UpdateNowData;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -55,13 +56,16 @@ public class userController {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private JWTUtil jwtUtil;
+
 
     /**
      * 用于进行登录
      */
-    // TODO:完善登录功能
     @PostMapping("/login")
-    public R<String> login(HttpServletRequest request, @RequestBody User user) {
+    // TODO：加入防止暴力破解的保护和密码加密
+    public R<Map<String, Object>> login(HttpServletRequest request, @RequestBody User user) {
         log.info("开始进行登录校验");
         String userName = user.getUserName();
         String password = user.getPassword();
@@ -72,16 +76,21 @@ public class userController {
         User sqlUser = userMapper.selectOne(qw);
 
         if (sqlUser == null) {
-            return R.error("用户不存在！");
+            return R.error("用户不存在或密码错误！");
         }
 
         if (!sqlUser.getPassword().equals(password)) {
-            return R.error("密码错误！");
+            return R.error("用户不存在或密码错误！");
         }
 
-        request.getSession().setAttribute("userName", userName);
+        Long userId = sqlUser.getUserId();
 
-        return R.success("登录成功");
+        // 生成 token 并返回
+        String token = jwtUtil.generateToken(userId, user.getUserName());
+        Map<String, Object> map = new HashMap<>();
+        map.put("token", token);
+
+        return R.success(map);
     }
 
     /**

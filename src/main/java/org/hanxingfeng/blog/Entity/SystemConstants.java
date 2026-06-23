@@ -10,10 +10,8 @@ public final class SystemConstants {
             // "E:\\obsdian\\blog\\src\\main\\resources\\zip"
     );
     public static final LocalDate START_TIME = LocalDate.of(2026,5,8);
-
-    public static final String KEY_NODE = "Node";
-
-    public static final String KEY_WORD = "Word";
+    // TODO：密钥放入配置文件
+    public static final String SECRET = "DemoNCloudClayHanXingFengDemoNCloudClayHanXingFeng";
 
     public static final String UPLOAD_DIR = "E:\\obsdian\\blog\\src\\main\\resources\\images\\";
 

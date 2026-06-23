@@ -2,14 +2,18 @@ package org.hanxingfeng.blog.other;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.context.annotation.Bean;
+import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.util.Date;
+import static org.hanxingfeng.blog.Entity.SystemConstants.SECRET;
 
+@Component
 public class JWTUtil {
     // 随机生成的 key
-    private final String SECRET = "thisIsMyKeysMaybeDemoNCloud";
+
     private final Key key =
             Keys.hmacShaKeyFor(
                     SECRET.getBytes(StandardCharsets.UTF_8)
@@ -17,16 +21,17 @@ public class JWTUtil {
 
     /**
      * 用于生成 token
+     * userId:用户 id
+     * userName:用户名称
      * @return 返回生成的 token
      */
-    public String generateToken() {
+    public String generateToken(Long userId, String userName) {
         JwtBuilder jwtBuilder = Jwts.builder();
 
         return jwtBuilder
                 // 添加 Payload
-                // TODO:不写死，后续根据业务修改
-                .claim("userName", "hxf") // 私有声明
-                .setSubject("2654826") // 注册声明
+                .claim("userName", userName) // 私有声明
+                .setSubject(String.valueOf((userId))) // 注册声明
                 .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60)) // 一小时后过期
                 // 添加 Signature
                 .signWith(key) // 这个方法会自动生成 Header 因此不需要再手动写 Header

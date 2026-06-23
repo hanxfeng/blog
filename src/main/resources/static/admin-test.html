@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>韩行风 · 管理后台 (JWT测试)</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- GitHub Markdown 样式 & 代码高亮 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css/github-markdown.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js/styles/github.min.css">
+
+    <!-- markdown-it 核心库 -->
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it/dist/markdown-it.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js/lib/common.min.js"></script>
+
+    <style>
+        body { background-color: #f9fafb; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; overflow-x: hidden; }
+
+        /* 背景与毛玻璃 */
+        .hero-section { height: 66vh; position: relative; overflow: hidden; }
+        .hero-image { width: 100%; height: 100%; object-fit: cover; }
+        .glass-card { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.3); }
+
+        /* 热力图样式 */
+        .contribution-grid { display: grid; grid-template-rows: repeat(7, 1fr); grid-auto-flow: column; gap: 3px; }
+        .square { width: 11px; height: 11px; border-radius: 2px; background-color: #ebedf0; transition: transform 0.2s; }
+        .square:hover { transform: scale(1.3); border: 1px solid #999; }
+        .level-0 { background-color: #ebedf0; }
+        .level-1 { background-color: #9be9a8; }
+        .level-2 { background-color: #40c463; }
+        .level-3 { background-color: #30a14e; }
+        .level-4 { background-color: #216e39; }
+
+        .fade-in { animation: fadeIn 0.6s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .hidden { display: none; }
+
+        /* 文章编辑模态框样式增强 */
+        .modal-overlay {
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
+        }
+        .markdown-preview {
+            background: #fafbfc;
+            border-radius: 1rem;
+            padding: 1.2rem;
+            max-height: 65vh;
+            overflow-y: auto;
+        }
+        .markdown-preview .markdown-body {
+            background: transparent;
+            font-size: 0.9rem;
+        }
+        textarea {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+        .overflow-y-scroll-custom {
+            scrollbar-width: thin;
+        }
+
+        /* JWT 调试面板 */
+        .debug-panel {
+            background: #f8fafc;
+            border: 1px dashed #cbd5e1;
+        }
+        .debug-panel pre {
+            white-space: pre-wrap;
+            word-break: break-all;
+            font-size: 0.75rem;
+            max-height: 180px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+
+<!-- 公共背景层 -->
+<header class="relative">
+    <div class="hero-section">
+        <img src="images/背景.png" alt="背景" class="hero-image">
+        <div class="absolute inset-0 bg-black/10"></div>
+    </div>
+    <!-- 右上角状态：JWT 令牌状态指示 -->
+    <div id="user-tag" class="absolute top-6 right-8 flex items-center space-x-3 bg-white/50 backdrop-blur-md p-2 rounded-full px-4 border border-white/30 shadow-sm z-50 hidden">
+        <span id="token-status" class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+        <span class="font-medium text-gray-800 text-sm" id="header-username">管理员</span>
+        <img src="images/头像.jpg" alt="头像" class="w-8 h-8 rounded-full border-2 border-white object-cover">
+        <button onclick="handleLogout()" class="text-[10px] text-gray-500 hover:text-red-500 ml-2 underline">登出</button>
+    </div>
+</header>
+
+<main class="max-w-5xl mx-auto -mt-32 relative z-10 px-4 mb-20">
+
+    <!-- 视图 A: 登录界面 -->
+    <div id="login-view" class="fade-in flex justify-center pt-10">
+        <div class="glass-card p-10 rounded-3xl shadow-2xl w-full max-w-sm border border-white">
+            <div class="text-center mb-10">
+                <img src="images/头像.jpg" alt="头像" class="w-20 h-20 rounded-full mx-auto border-4 border-white shadow-lg mb-4 object-cover">
+                <h2 class="text-xl font-light text-gray-800 tracking-[0.2em]">后台管理校验 · JWT</h2>
+            </div>
+            <div class="space-y-6">
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-2 ml-1">用户 ID</label>
+                    <input type="text" id="userNameInput" placeholder="请输入用户名称" class="w-full px-4 py-3 rounded-xl border-none bg-white/50 focus:ring-2 focus:ring-blue-400 outline-none transition-all">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-2 ml-1">Password</label>
+                    <input type="password" id="password" placeholder="请输入密码" class="w-full px-4 py-3 rounded-xl border-none bg-white/50 focus:ring-2 focus:ring-blue-400 outline-none transition-all">
+                </div>
+                <button onclick="handleLogin()" class="w-full py-4 bg-gray-900 text-white rounded-xl font-medium hover:bg-black transition-all shadow-lg active:scale-95">
+                    进入系统
+                </button>
+            </div>
+            <p id="login-msg" class="text-center mt-6 text-xs text-red-500 min-h-[1rem]"></p>
+        </div>
+    </div>
+
+    <!-- 视图 B: 管理界面 (包含文章编辑增强) -->
+    <div id="admin-view" class="hidden fade-in">
+        <!-- 管理操作工具栏 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+            <div onclick="handleUpdateData()" class="glass-card p-4 rounded-xl shadow-lg flex items-center justify-between cursor-pointer hover:bg-white transition-all group">
+                <div class="flex items-center space-x-4">
+                    <div class="p-3 bg-blue-50 rounded-lg group-hover:bg-blue-100 transition-colors">
+                        <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    </div>
+                    <div><p class="text-sm font-bold text-gray-700">同步今日数据</p><p class="text-[10px] text-gray-400">更新 Redis 与数据库统计</p></div>
+                </div>
+            </div>
+            <div onclick="triggerFileUpload()" class="glass-card p-4 rounded-xl shadow-lg flex items-center justify-between cursor-pointer hover:bg-white transition-all group">
+                <div class="flex items-center space-x-4">
+                    <div class="p-3 bg-emerald-50 rounded-lg group-hover:bg-emerald-100 transition-colors">
+                        <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    </div>
+                    <div><p class="text-sm font-bold text-gray-700">发布新文章</p><p class="text-[10px] text-gray-400">上传 Markdown (.md) 文件</p></div>
+                </div>
+                <input type="file" id="md-upload" class="hidden" accept=".md" onchange="handleFileUpload(this)">
+            </div>
+        </div>
+
+        <!-- 数据统计区 -->
+        <div class="flex flex-col md:flex-row gap-6 items-stretch mb-10">
+            <div class="w-full md:w-1/3 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                <h3 class="text-[10px] font-bold text-gray-400 uppercase mb-4 tracking-widest">Live Stats</h3>
+                <div class="space-y-4">
+                    <div><p class="text-2xl font-light text-gray-800" id="yesterday-count">0</p><p class="text-xs text-gray-400">今日新增 (篇)</p></div>
+                    <div><p class="text-2xl font-light text-blue-600" id="yesterday-words">0</p><p class="text-xs text-gray-400">今日字数 (字)</p></div>
+                </div>
+            </div>
+            <div class="w-full md:w-2/3 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                <h3 class="text-[10px] font-bold text-gray-400 uppercase mb-4 tracking-widest">Writing Activity Preview</h3>
+                <div class="overflow-x-auto pb-2"><div class="contribution-grid" id="heatmap"></div></div>
+            </div>
+        </div>
+
+        <!-- 文章列表管理 (支持点击编辑) -->
+        <section>
+            <div class="flex justify-between items-center mb-6 px-2">
+                <h2 class="text-lg font-light text-gray-800">文章内容管理 · 点击卡片编辑</h2>
+                <span class="text-[10px] text-gray-400" id="article-total">Loading...</span>
+            </div>
+            <div class="grid grid-cols-1 gap-3" id="admin-article-list"></div>
+        </section>
+
+        <!-- ===== JWT 调试面板 ===== -->
+        <section class="mt-10">
+            <div class="debug-panel p-5 rounded-xl">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest">JWT 调试面板</h3>
+                    <button onclick="toggleDebugDetail()" class="text-[10px] text-blue-500 hover:underline">展开/收起</button>
+                </div>
+                <div class="mb-2">
+                    <span class="text-[10px] text-gray-400">当前 Token:</span>
+                    <p class="text-xs font-mono text-gray-600 break-all bg-white p-2 rounded border mt-1" id="debug-token">未登录</p>
+                </div>
+                <div id="debug-detail" class="hidden mt-3">
+                    <div class="mb-2">
+                        <span class="text-[10px] text-gray-400">Token Payload (解析):</span>
+                        <pre class="text-xs text-gray-600 bg-white p-2 rounded border mt-1" id="debug-payload">-</pre>
+                    </div>
+                    <div class="mb-2">
+                        <span class="text-[10px] text-gray-400">Token 过期时间:</span>
+                        <p class="text-xs text-gray-600" id="debug-expiry">-</p>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-gray-400">最近响应:</span>
+                        <pre class="text-xs text-gray-600 bg-white p-2 rounded border mt-1" id="debug-last-response">-</pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+</main>
+
+<!-- ================= 文章编辑模态框（支持 Markdown 实时预览） ================= -->
+<div id="editModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 modal-overlay transition-all duration-200" style="display: none;">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-6xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-gray-200">
+        <!-- 模态框头部 -->
+        <div class="flex justify-between items-center px-6 py-4 border-b border-gray-100 bg-gray-50/60">
+            <h3 class="text-lg font-medium text-gray-800">✍️ 编辑文章</h3>
+            <button onclick="closeEditModal()" class="text-gray-400 hover:text-gray-600 transition p-1 rounded-full">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        <!-- 双栏布局：左侧编辑区 + 右侧预览区 -->
+        <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
+            <!-- 左侧编辑器 -->
+            <div class="w-full md:w-1/2 flex flex-col border-r border-gray-100 bg-white">
+                <div class="p-4 border-b border-gray-50 bg-gray-50/30">
+                    <label class="text-xs font-bold uppercase text-gray-400 tracking-wider">文章标题</label>
+                    <input type="text" id="editTitle" placeholder="输入标题..." class="mt-1 w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-300 focus:border-blue-300 outline-none transition bg-white">
+                </div>
+                <div class="flex-1 flex flex-col p-4">
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="text-xs font-bold uppercase text-gray-400 tracking-wider">Markdown 正文</label>
+                        <span class="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">支持标准 Markdown 语法</span>
+                    </div>
+                    <textarea id="editContent" rows="12" class="flex-1 w-full border border-gray-200 rounded-xl p-4 font-mono text-sm resize-none focus:ring-2 focus:ring-blue-200 outline-none bg-gray-50/40" placeholder="在这里编写文章内容 (Markdown) ..."></textarea>
+                    <div class="mt-3 text-[10px] text-gray-400 flex gap-3">
+                        <span>💡 实时预览在右侧</span>
+                        <span>🔗 代码块会自动高亮</span>
+                    </div>
+                </div>
+            </div>
+            <!-- 右侧预览区 (markdown 渲染) -->
+            <div class="w-full md:w-1/2 flex flex-col bg-gray-50/20">
+                <div class="p-4 border-b border-gray-100 bg-gray-50/30">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold uppercase text-gray-400 tracking-wider">实时预览</span>
+                        <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+                    </div>
+                </div>
+                <div class="flex-1 overflow-y-auto p-5 markdown-preview bg-white/50">
+                    <div id="livePreview" class="markdown-body"></div>
+                </div>
+            </div>
+        </div>
+        <!-- 底部按钮 -->
+        <div class="flex justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/40">
+            <button onclick="closeEditModal()" class="px-5 py-2 rounded-xl text-gray-600 border border-gray-200 hover:bg-gray-100 transition">取消</button>
+            <button id="saveBtn" onclick="saveArticleEdit()" class="px-6 py-2 bg-gray-900 text-white rounded-xl hover:bg-black transition shadow-sm active:scale-95 font-medium">保存修改</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const API_BASE = "";  // 根据实际后端地址修改（同域可留空）
+
+    // ---------- JWT 状态 ----------
+    let authToken = null;          // 当前 JWT token
+    let tokenPayload = null;       // 解析后的 payload
+    let currentEditId = null;      // 当前编辑的文章ID
+    let isSaving = false;          // 防重复提交
+
+    // ---------- 初始化 markdown-it ----------
+    const md = window.markdownit({
+        html: false,
+        linkify: true,
+        typographer: true,
+        highlight: function (str, lang) {
+            if (lang && hljs.getLanguage(lang)) {
+                try {
+                    return hljs.highlight(str, { language: lang }).value;
+                } catch (__) {}
+            }
+            return '';
+        }
+    });
+
+    function renderMarkdownToHtml(markdownText) {
+        if (!markdownText) return '<p class="text-gray-400 text-center">暂无内容，预览区将显示此处</p>';
+        let rendered = md.render(markdownText);
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = rendered;
+        wrapper.querySelectorAll('pre code').forEach((block) => {
+            hljs.highlightElement(block);
+        });
+        return wrapper.innerHTML;
+    }
+
+    function updatePreview() {
+        const content = document.getElementById('editContent').value;
+        const previewHtml = renderMarkdownToHtml(content);
+        document.getElementById('livePreview').innerHTML = previewHtml;
+        document.querySelectorAll('#livePreview pre code').forEach((block) => {
+            hljs.highlightElement(block);
+        });
+    }
+
+    // ===================== JWT 辅助函数 =====================
+    function setToken(token) {
+        authToken = token;
+        try {
+            // 解析 JWT payload（中间段）
+            const payloadBase64 = token.split('.')[1];
+            const payloadJson = atob(payloadBase64);
+            tokenPayload = JSON.parse(payloadJson);
+        } catch (e) {
+            tokenPayload = null;
+        }
+        updateDebugPanel();
+    }
+
+    function clearToken() {
+        authToken = null;
+        tokenPayload = null;
+        updateDebugPanel();
+    }
+
+    // 为需要认证的请求添加 token 头
+    function authHeaders(extraHeaders) {
+        const headers = extraHeaders || {};
+        if (authToken) {
+            headers['token'] = authToken;
+        }
+        return headers;
+    }
+
+    function updateDebugPanel() {
+        const tokenEl = document.getElementById('debug-token');
+        const payloadEl = document.getElementById('debug-payload');
+        const expiryEl = document.getElementById('debug-expiry');
+
+        if (authToken) {
+            tokenEl.innerText = authToken;
+            tokenEl.className = 'text-xs font-mono text-emerald-600 break-all bg-white p-2 rounded border mt-1';
+        } else {
+            tokenEl.innerText = '未登录';
+            tokenEl.className = 'text-xs font-mono text-red-400 break-all bg-white p-2 rounded border mt-1';
+        }
+
+        if (tokenPayload) {
+            payloadEl.textContent = JSON.stringify(tokenPayload, null, 2);
+            const exp = tokenPayload.exp;
+            if (exp) {
+                const expDate = new Date(exp * 1000);
+                const now = new Date();
+                const remaining = Math.max(0, Math.floor((expDate - now) / 1000 / 60));
+                expiryEl.innerHTML = expDate.toLocaleString()
+                    + ' <span class="' + (remaining < 10 ? 'text-red-500' : 'text-emerald-600') + '">(剩余约 ' + remaining + ' 分钟)</span>';
+            } else {
+                expiryEl.innerText = '无法解析过期时间';
+            }
+        } else {
+            payloadEl.textContent = '-';
+            expiryEl.innerText = '-';
+        }
+    }
+
+    function updateLastResponse(reqLabel, respObj) {
+        const el = document.getElementById('debug-last-response');
+        try {
+            el.textContent = '[' + reqLabel + ']\n' + JSON.stringify(respObj, null, 2);
+        } catch (e) {
+            el.textContent = '[' + reqLabel + ']\n' + String(respObj);
+        }
+    }
+
+    function toggleDebugDetail() {
+        const detail = document.getElementById('debug-detail');
+        detail.classList.toggle('hidden');
+    }
+
+    // ===================== 认证 =====================
+    function showAdminView() {
+        document.getElementById('login-view').classList.add('hidden');
+        document.getElementById('admin-view').classList.remove('hidden');
+        document.getElementById('user-tag').classList.remove('hidden');
+
+        if (tokenPayload) {
+            document.getElementById('header-username').innerText =
+                '管理员 · ' + (tokenPayload.userName || 'ID:' + tokenPayload.sub);
+        }
+        loadStats();
+        loadArticles();
+    }
+
+    function handleLogout() {
+        clearToken();
+        document.getElementById('login-view').classList.remove('hidden');
+        document.getElementById('admin-view').classList.add('hidden');
+        document.getElementById('user-tag').classList.add('hidden');
+        document.getElementById('login-msg').innerText = '';
+        document.getElementById('userNameInput').value = '';
+        document.getElementById('password').value = '';
+    }
+
+    async function handleLogin() {
+	const userName = document.getElementById('userNameInput').value.trim();  // 直接作为用户名
+    	const password = document.getElementById('password').value;
+    	const msgEl = document.getElementById('login-msg');
+    	if (!userName || !password) {
+        	msgEl.innerText = "请输入完整凭据";
+        	return;
+    	}
+
+        try {
+            const res = await fetch(`${API_BASE}/admin/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userName: userName, password: password })
+            });
+            const r = await res.json();
+            updateLastResponse('POST /admin/login', r);
+            if (r.code === 1) {
+                const token = r.data && r.data.token;
+                if (!token) {
+                    msgEl.innerText = "服务器未返回 token";
+                    return;
+                }
+                setToken(token);
+                msgEl.classList.replace('text-red-500', 'text-emerald-600');
+                msgEl.innerText = "校验通过，正在进入...";
+                setTimeout(() => showAdminView(), 500);
+            } else {
+                msgEl.innerText = r.msg || "账号或密码错误";
+            }
+        } catch (e) {
+            msgEl.innerText = "无法连接至身份服务器";
+        }
+    }
+
+    // ===================== 数据加载 =====================
+    async function loadStats() {
+        try {
+            const res = await fetch(`${API_BASE}/blog/selectNow`);
+            const r = await res.json();
+            if(r.code === 1) {
+                document.getElementById('yesterday-count').innerText = r.data.dailyNoteCount;
+                document.getElementById('yesterday-words').innerText = r.data.dailyNoteWordCount;
+            }
+            const resList = await fetch(`${API_BASE}/blog/select`);
+            const rList = await resList.json();
+            renderHeatmap(rList.data);
+        } catch (e) { console.warn(e); }
+    }
+
+    async function loadArticles() {
+        const container = document.getElementById('admin-article-list');
+        try {
+            const res = await fetch(`${API_BASE}/blog/getBriefWritings`);
+            const r = await res.json();
+            const list = r.data.records;
+            document.getElementById('article-total').innerText = `共 ${r.data.total} 篇文章`;
+            container.innerHTML = list.map(item => `
+                <div onclick="openEditModal(${item.id})"
+                     class="group p-5 bg-white rounded-xl border border-gray-100 hover:shadow-md transition-all cursor-pointer flex justify-between items-center">
+                    <div class="flex-1 pr-4">
+                        <h3 class="text-base font-medium text-gray-800 group-hover:text-blue-600 transition">${escapeHtml(item.title) || '无标题'}</h3>
+                        <div class="flex items-center space-x-3 mt-1 text-[10px] text-gray-400">
+                            <span>${item.createTime || '未知日期'}</span>
+                            <span class="bg-gray-50 px-1.5 py-0.5 rounded border">ID: ${item.id}</span>
+                        </div>
+                    </div>
+                    <button onclick="event.stopPropagation(); deleteArticle(${item.id}, '${escapeHtml(item.title).replace(/'/g, "\\'")}')"
+                            class="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    </button>
+                </div>
+            `).join('');
+        } catch (e) {
+            container.innerHTML = `<p class="text-center text-gray-400 py-10">加载失败, 请检查网络</p>`;
+        }
+    }
+
+    // ===================== 管理操作（带 JWT token） =====================
+    async function handleUpdateData() {
+        if (!confirm("同步后端统计数据？")) return;
+        const res = await fetch(`${API_BASE}/admin/update`, {
+            headers: authHeaders()
+        });
+        const r = await res.json();
+        updateLastResponse('GET /admin/update', r);
+        if (r.code === 1) alert("同步成功"), loadStats();
+        else alert("同步失败: " + (r.msg || r.code));
+    }
+
+    function triggerFileUpload() { document.getElementById('md-upload').click(); }
+
+    async function handleFileUpload(input) {
+        if(!input.files.length) return;
+        const formData = new FormData();
+        formData.append('file', input.files[0]);
+        const res = await fetch(`${API_BASE}/admin/writingsUpload`, {
+            method: 'POST',
+            headers: authHeaders(),
+            body: formData
+        });
+        const r = await res.json();
+        updateLastResponse('POST /admin/writingsUpload', r);
+        if (r.code === 1) alert("上传成功"), loadArticles();
+        else alert("上传失败: " + (r.msg || r.code));
+        input.value = '';
+    }
+
+    async function deleteArticle(id, title) {
+        if (!confirm(`确定删除《${title}》？操作不可恢复。`)) return;
+        const res = await fetch(`${API_BASE}/admin/delete/${id}`, {
+            headers: authHeaders()
+        });
+        const r = await res.json();
+        updateLastResponse('GET /admin/delete/' + id, r);
+        if (r.code === 1) {
+            alert("删除成功");
+            loadArticles();
+            loadStats();
+        } else alert(r.msg || "删除失败");
+    }
+
+    // ===================== 热力图 =====================
+    function renderHeatmap(dataList) {
+        const heatmap = document.getElementById('heatmap');
+        heatmap.innerHTML = '';
+        const startDate = new Date('2026-05-09');
+        const dataMap = new Map();
+        if(dataList) dataList.forEach(item => dataMap.set(item.todayTime, item.dailyNoteWordCount));
+        for (let i = 0; i < 365; i++) {
+            const curr = new Date(startDate);
+            curr.setDate(startDate.getDate() + i);
+            const dStr = curr.toISOString().split('T')[0];
+            const count = dataMap.get(dStr) || 0;
+            const sq = document.createElement('div');
+            sq.className = `square level-${getLevel(count)}`;
+            sq.title = `${dStr}: ${count} 字`;
+            heatmap.appendChild(sq);
+        }
+    }
+
+    function getLevel(c) {
+        if (c <= 0) return 0;
+        if (c < 500) return 1;
+        if (c < 1500) return 2;
+        if (c < 3000) return 3;
+        return 4;
+    }
+
+    function escapeHtml(str) {
+        if(!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if(m === '&') return '&amp;';
+            if(m === '<') return '&lt;';
+            if(m === '>') return '&gt;';
+            return m;
+        });
+    }
+
+    // ===================== 文章编辑 =====================
+    async function openEditModal(articleId) {
+        if (!articleId) return;
+        currentEditId = articleId;
+        const modal = document.getElementById('editModal');
+        modal.style.display = 'flex';
+        modal.classList.add('items-center', 'justify-center');
+
+        document.getElementById('editTitle').value = '加载中...';
+        document.getElementById('editContent').value = '# 正在获取文章内容';
+        updatePreview();
+
+        try {
+            const res = await fetch(`${API_BASE}/blog/getOne/${articleId}`);
+            const result = await res.json();
+            if (result.code === 1 && result.data) {
+                const article = result.data;
+                document.getElementById('editTitle').value = article.title || '';
+                document.getElementById('editContent').value = article.content || '';
+                updatePreview();
+            } else {
+                alert("文章详情加载失败：" + (result.msg || "未知错误"));
+                closeEditModal();
+            }
+        } catch (err) {
+            console.error(err);
+            alert("网络错误，无法加载文章内容");
+            closeEditModal();
+        }
+    }
+
+    function closeEditModal() {
+        const modal = document.getElementById('editModal');
+        modal.style.display = 'none';
+        currentEditId = null;
+        document.getElementById('editTitle').value = '';
+        document.getElementById('editContent').value = '';
+        document.getElementById('livePreview').innerHTML = '<div class="text-gray-400 text-center p-8">预览区域将实时渲染</div>';
+    }
+
+    async function saveArticleEdit() {
+        if (isSaving) return;
+        if (!currentEditId) {
+            alert("缺少文章标识，请重新打开编辑");
+            return;
+        }
+        const newTitle = document.getElementById('editTitle').value.trim();
+        const newContent = document.getElementById('editContent').value;
+        if (!newTitle) { alert("标题不能为空"); return; }
+        if (!newContent) { alert("内容不能为空"); return; }
+
+        isSaving = true;
+        const saveBtn = document.getElementById('saveBtn');
+        const originalBtnText = saveBtn.innerText;
+        saveBtn.innerText = '保存中...';
+        saveBtn.disabled = true;
+
+        try {
+            const response = await fetch(`${API_BASE}/admin/updateWritingById`, {
+                method: 'POST',
+                headers: authHeaders({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify({
+                    id: currentEditId,
+                    title: newTitle,
+                    content: newContent
+                })
+            });
+            const result = await response.json();
+            updateLastResponse('POST /admin/updateWritingById', result);
+            if (result.code === 1) {
+                alert("文章更新成功！");
+                closeEditModal();
+                await loadArticles();
+                loadStats();
+            } else {
+                alert("保存失败: " + (result.msg || "接口返回错误"));
+            }
+        } catch (error) {
+            console.error("update error", error);
+            alert("网络错误，无法保存修改，请检查后端服务");
+        } finally {
+            isSaving = false;
+            saveBtn.innerText = originalBtnText;
+            saveBtn.disabled = false;
+        }
+    }
+
+    function bindPreviewEvents() {
+        const contentTextarea = document.getElementById('editContent');
+        if (contentTextarea) {
+            contentTextarea.addEventListener('input', () => updatePreview());
+        }
+    }
+
+    function initModalEvent() {
+        const modal = document.getElementById('editModal');
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeEditModal();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && modal.style.display === 'flex') {
+                closeEditModal();
+            }
+        });
+        bindPreviewEvents();
+    }
+
+    window.onload = () => {
+        initModalEvent();
+        setTimeout(() => {
+            if(document.getElementById('editContent')) bindPreviewEvents();
+        }, 100);
+    };
+</script>
+</body>
+</html>
