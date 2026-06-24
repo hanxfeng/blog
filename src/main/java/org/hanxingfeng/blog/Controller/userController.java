@@ -18,6 +18,7 @@ import org.hanxingfeng.blog.other.UpdateNowData;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
@@ -29,6 +30,7 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.ToDoubleBiFunction;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 @Slf4j
 @RestController
@@ -59,14 +61,34 @@ public class userController {
     @Autowired
     private JWTUtil jwtUtil;
 
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    // TODO：添加在线写作功能
+    // TODO：新增关于我页面
+    // TODO：友情链接
+    // TODO：文章置顶功能
+    // TODO：访问量统计功能
 
     /**
      * 用于进行登录
      */
     @PostMapping("/login")
-    // TODO：加入防止暴力破解的保护和密码加密
     public R<Map<String, Object>> login(HttpServletRequest request, @RequestBody User user) {
         log.info("开始进行登录校验");
+        String key = "loginCount";
+        String result = redisTemplate.opsForValue().get(key);
+        Long count;
+        if (result == null) {
+            count = 1L;
+            redisTemplate.opsForValue().set(key, String.valueOf(count));
+        }
+        else {
+            count = Long.valueOf(result);
+            return R.error("尝试次数过多请一小时后再试或联系管理员处理");
+        }
+
+
         String userName = user.getUserName();
         String password = user.getPassword();
 
@@ -75,11 +97,8 @@ public class userController {
         qw.eq(User::getUserName, userName);
         User sqlUser = userMapper.selectOne(qw);
 
-        if (sqlUser == null) {
-            return R.error("用户不存在或密码错误！");
-        }
-
-        if (!sqlUser.getPassword().equals(password)) {
+        if (sqlUser == null || passwordEncoder.matches(password, sqlUser.getPassword())) {
+            redisTemplate.opsForValue().set(key, String.valueOf(count + 1));
             return R.error("用户不存在或密码错误！");
         }
 
@@ -89,6 +108,8 @@ public class userController {
         String token = jwtUtil.generateToken(userId, user.getUserName());
         Map<String, Object> map = new HashMap<>();
         map.put("token", token);
+
+        redisTemplate.delete(key);
 
         return R.success(map);
     }

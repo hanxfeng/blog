@@ -8,8 +8,10 @@ import io.jsonwebtoken.security.Keys;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.hanxingfeng.blog.Entity.NodeCount;
+import org.hanxingfeng.blog.Entity.User;
 import org.hanxingfeng.blog.Entity.Writings;
 import org.hanxingfeng.blog.Mapper.BlogMapper;
+import org.hanxingfeng.blog.Mapper.UserMapper;
 import org.hanxingfeng.blog.Mapper.WritingsMapper;
 import org.hanxingfeng.blog.other.UpdateNowData;
 import org.junit.jupiter.api.Test;
@@ -17,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.io.File;
 import java.io.IOException;
@@ -48,6 +51,13 @@ class BlogApplicationTests {
     @Autowired
     private BlogMapper blogMapper;
 
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private UserMapper userMapper;
+
+
     @Test
     void contextLoads() throws Exception {
 
@@ -68,33 +78,24 @@ class BlogApplicationTests {
     private static final Key SECRET_KEY = Keys.secretKeyFor(SignatureAlgorithm.HS256);
     @Test
     /**
-     * JWT 加密
+     * 初始密码加密加密
      */
-    void jwt() {
-        System.out.println(SECRET_KEY.toString());
-        JwtBuilder jwtBuilder = Jwts.builder();
-        String toke = jwtBuilder
-                // 添加 Header
-                .setHeaderParam("typ", "JWT")
-                .setHeaderParam("alg", "HS256")
-                // 添加 Payload
-                .claim("userName", "hxf") // 私有声明
-                .setSubject("2654826") // 注册声明
-                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60)) // 一小时后过期
-                // 添加 Signature
-                .signWith(SECRET_KEY)
-                // 将以上三部分用 . 拼接
-                .compact();
-        System.out.println(toke);
-
-        Jws<Claims> claimsJwt = Jwts.parserBuilder()
-                .setSigningKey(SECRET_KEY)          // SECRET_KEY 可为 String/byte[]/Key
-                .build()                            // 构建 JwtParser
-                .parseClaimsJws(toke);             // 解析并验证 JWS
-
-        Claims claims = claimsJwt.getBody();
-        System.out.println(claims.get("userName"));
+    void l() {
+        User user = userMapper.selectById(1);
+        String newPassword = passwordEncoder.encode("15263715582");
+        user.setPassword(newPassword);
+        userMapper.updateById(user);
     }
+
+    @Test
+    void loginTest(){
+        User user = userMapper.selectById(1);
+        String password = user.getPassword();
+        if (passwordEncoder.matches("15263715582", password)) {
+            System.out.println("成功：{}");
+        }
+    }
+
 
     @Test
     void parse() {

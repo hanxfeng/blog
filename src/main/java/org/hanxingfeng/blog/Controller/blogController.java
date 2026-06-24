@@ -183,4 +183,19 @@ public class blogController {
         }
         return R.success(rWriting);
     }
+
+    /**
+     * 用于模糊查询，即搜索
+     * @param keyLike
+     * @return
+     */
+    // TODO：实现分页并进行测试
+    @PostMapping("/selectWriting")
+    public R<List<SummaryWriting>> selectWriting(String keyLike) {
+        LambdaQueryWrapper<SummaryWriting> qw = new LambdaQueryWrapper<>();
+        qw.like(SummaryWriting::getTitle, keyLike);
+        List<SummaryWriting> re = summaryWritingMapper.selectList(qw);
+
+        return R.success(re);
+    }
 }
