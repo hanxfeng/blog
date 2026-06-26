@@ -1,4 +1,4 @@
-package org.hanxingfeng.blog.other;
+package org.hanxingfeng.blog.UtilAndOther;
 
 public class FileNameUtil {
 

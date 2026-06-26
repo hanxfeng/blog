@@ -1,4 +1,4 @@
-package org.hanxingfeng.blog.other;
+package org.hanxingfeng.blog.UtilAndOther;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -9,7 +9,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.hanxingfeng.blog.Entity.NodeCount;
 import org.hanxingfeng.blog.Mapper.BlogMapper;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 

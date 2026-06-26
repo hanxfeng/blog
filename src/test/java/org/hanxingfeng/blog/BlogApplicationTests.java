@@ -1,36 +1,32 @@
 package org.hanxingfeng.blog;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
-import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.hanxingfeng.blog.Entity.NodeCount;
 import org.hanxingfeng.blog.Entity.User;
-import org.hanxingfeng.blog.Entity.Writings;
 import org.hanxingfeng.blog.Mapper.BlogMapper;
 import org.hanxingfeng.blog.Mapper.UserMapper;
 import org.hanxingfeng.blog.Mapper.WritingsMapper;
-import org.hanxingfeng.blog.other.UpdateNowData;
+import org.hanxingfeng.blog.UtilAndOther.UpdateNowData;
+import org.hanxingfeng.blog.UtilAndOther.getGitHubCommit;
+import org.hanxingfeng.blog.config.RepoConfig;
+import org.hanxingfeng.blog.dto.GithubCommitDTO;
+import org.hanxingfeng.blog.dto.GithubCommitDetailDTO;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.reactive.function.client.WebClient;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Paths;
 import java.security.Key;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.Date;
-
-import static io.jsonwebtoken.security.Keys.secretKeyFor;
-import static org.hanxingfeng.blog.Entity.SystemConstants.UPLOAD_DIR;
+import java.time.ZoneOffset;
+import java.util.List;
 
 @Slf4j
 @SpringBootTest
@@ -56,6 +52,16 @@ class BlogApplicationTests {
 
     @Autowired
     private UserMapper userMapper;
+
+    @Autowired
+    private WebClient githubWebClient;
+
+    // 从 application.yml/properties 读取仓库所有者、仓库名和用户名
+    @Value("${github.owner}")
+    private String owner;
+
+    @Value("${github.username}")
+    private String username;
 
 
     @Test
@@ -99,15 +105,31 @@ class BlogApplicationTests {
 
     @Test
     void parse() {
-        String token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyTmFtZSI6Imh4ZiIsInN1YiI6IjI2NTQ4MjYiLCJleHAiOjE3ODIwMzEyMDB9.HqNtO2zVPJ74hKL2TbUaYV7-eeJ_X1p6Nq8xBzHKTEo";
 
-        // 使用 parserBuilder() 替代废弃的 parser()
-        Jws<Claims> claimsJwt = Jwts.parserBuilder()
-                .setSigningKey(SECRET_KEY)          // SECRET_KEY 可为 String/byte[]/Key
-                .build()                            // 构建 JwtParser
-                .parseClaimsJws(token);             // 解析并验证 JWS
+        LocalDate yesterday = LocalDate.now(ZoneOffset.UTC).minusDays(2);
+        String since = yesterday.atStartOfDay(ZoneOffset.UTC).toInstant().toString();
+        String until = yesterday.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant().toString();
+        List<GithubCommitDTO> r1e = githubWebClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/repos/{owner}/{repo}/commits")
+                        .queryParam("author", username)
+                        .queryParam("since", since)
+                        .queryParam("until", until)
+                        .build(owner, "blog"))
+                .retrieve()
+                .bodyToFlux(GithubCommitDTO.class)
+                .collectList()
+                .block();
+        // TODO:测试通过
+        GithubCommitDetailDTO re = githubWebClient.get()
+                .uri("/repos/{owner}/{repo}/commits/{sha}",
+                        owner, "blog", "b73d4402a34909a768e60cbe015671efce4882ab")    // 按顺序填充三个占位符
+                .retrieve()
+                .bodyToMono(GithubCommitDetailDTO.class) // 解析为单个对象
+                .block();                    // 同步阻塞
 
-        Claims claims = claimsJwt.getBody();
-        System.out.println(claims.get("userName"));
+
+
+        System.out.println(re.toString());
     }
 }

@@ -1,18 +1,13 @@
 package org.hanxingfeng.blog.Filter;
 
 import io.jsonwebtoken.Claims;
-import jakarta.servlet.*;
-import jakarta.servlet.annotation.WebFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.extern.slf4j.Slf4j;
-import org.hanxingfeng.blog.other.JWTUtil;
+import org.hanxingfeng.blog.UtilAndOther.JWTUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.ModelAndView;
-
-import java.io.IOException;
 
 @Component
 public class LoginFilter implements HandlerInterceptor {

@@ -1,0 +1,168 @@
+// 包路径，根据项目实际结构调整
+package org.hanxingfeng.blog.Service;
+
+// ---------- Spring 核心注解 ----------
+import org.springframework.stereotype.Service;          // 标识为 Spring Bean
+import org.springframework.beans.factory.annotation.Value; // 注入配置文件中的属性
+// ---------- Lombok ----------
+import lombok.RequiredArgsConstructor;               // 生成包含 final 字段的构造器
+// ---------- WebClient ----------
+import org.springframework.web.reactive.function.client.WebClient; // 非阻塞 HTTP 客户端
+// ---------- 时间处理 ----------
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+// ---------- 集合 ----------
+import java.util.List;
+
+// ---------- 自定义 DTO 和实体 ----------
+// 假设这些类位于以下包中（根据实际项目调整）
+import org.hanxingfeng.blog.dto.GithubCommitDTO;      // GitHub 提交列表项 DTO
+import org.hanxingfeng.blog.dto.GithubCommitDetailDTO; // GitHub 提交详情 DTO
+import org.hanxingfeng.blog.Entity.CommitStat;         // 提交统计实体
+
+
+/**
+ * GitHub API 服务类
+ * 封装对 GitHub REST API 的调用，使用 WebClient 进行声明式 HTTP 请求。
+ * 需要预先配置 WebClient Bean（通常设置 baseUrl = https://api.github.com 并添加认证 Token）。
+ */
+@Service
+@RequiredArgsConstructor  // 为 final 字段自动生成构造器（依赖注入）
+public class GithubService {
+
+    // 注入 WebClient 实例（已配置好 baseUrl 和认证头）
+    private final WebClient githubWebClient;
+
+    // 从 application.yml/properties 读取仓库所有者、仓库名和用户名
+    @Value("${github.owner}")
+    private String owner;
+
+    @Value("${github.repo}")
+    private String repo;
+
+    @Value("${github.username}")
+    private String username;
+
+    /**
+     * 获取当前用户今日在指定仓库中的所有提交记录（仅列表信息，不含详细变更统计）。
+     * 使用 GitHub API: GET /repos/{owner}/{repo}/commits
+     * 通过 since / until 参数过滤今日提交，author 参数过滤指定用户。
+     *
+     * @return 今日提交的 DTO 列表，每个包含 sha、commit.message、commit.author.date 等信息。
+     *         注意：block() 会将异步 Flux 转为同步阻塞，适合定时任务等场景；
+     *         若在 Web 请求中使用，建议改为异步返回 Mono/Flux。
+     */
+    public List<GithubCommitDTO> getTodayCommits() {
+        // 获取今天的日期
+        LocalDate today = LocalDate.now();
+
+        // 构造 ISO 8601 格式的时间范围：今日 00:00:00 至 23:59:59
+        // atStartOfDay() 返回 LocalDateTime，拼接 "Z" 表示 UTC 时区（GitHub API 默认使用 UTC）
+        String since = today.atStartOfDay() + "Z";          // 例：2026-06-26T00:00:00Z
+        String until = today.atTime(23, 59, 59) + "Z";     // 例：2026-06-26T23:59:59Z
+
+        // 发起 GET 请求，路径为 /repos/{owner}/{repo}/commits
+        // 使用 uriBuilder 动态拼接查询参数：author、since、until
+        return githubWebClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/repos/{owner}/{repo}/commits")
+                        .queryParam("author", username)
+                        .queryParam("since", since)
+                        .queryParam("until", until)
+                        .build(owner, repo))   // 填充路径中的占位符
+                .retrieve()                     // 获取响应体
+                .bodyToFlux(GithubCommitDTO.class) // 将响应流解析为 Flux（异步流）
+                .collectList()                  // 聚合成 List
+                .block();                      // 阻塞等待结果返回（同步方式）
+    }
+
+    /**
+     * 根据提交 SHA 获取该次提交的详细信息，包含文件变更统计（增删行数）。
+     * 使用 GitHub API: GET /repos/{owner}/{repo}/commits/{sha}
+     *
+     * @param sha 提交的唯一哈希值
+     * @return 提交详情 DTO，内含 stats（additions, deletions, total）等信息。
+     */
+    public GithubCommitDetailDTO getCommitDetail(String sha) {
+        // 直接使用占位符填充路径，返回 Mono（异步单个结果）后阻塞获取
+        return githubWebClient.get()
+                .uri("/repos/{owner}/{repo}/commits/{sha}",
+                        owner, repo, sha)    // 按顺序填充三个占位符
+                .retrieve()
+                .bodyToMono(GithubCommitDetailDTO.class) // 解析为单个对象
+                .block();                    // 同步阻塞
+    }
+}
+
+/**
+ * 提交统计同步服务
+ * 定时从 GitHub 拉取今日提交，计算每次提交的变更行数，并存入数据库。
+ * 使用 CommitStatRepository 进行持久化，通过 GithubService 获取数据。
+ */
+@Service
+@RequiredArgsConstructor
+public class CommitStatService {
+
+    // private final CommitStatRepository repository;   // 数据访问层，负责 CRUD
+    private final GithubService githubService;       // GitHub API 调用服务
+
+    /**
+     * 同步今日所有提交的统计数据。
+     * 流程：
+     * 1. 调用 GithubService 获取今日提交列表（仅基本信息）。
+     * 2. 遍历每个提交，若数据库中已存在该 SHA 则跳过（避免重复处理）。
+     * 3. 调用 GithubService 获取提交详情（含变更统计）。
+     * 4. 构建 CommitStat 实体，填充字段（SHA、消息、增删改总数、提交时间等）。
+     * 5. 保存到数据库。
+     *
+     * 注意：该方法会阻塞等待 GitHub API 响应，建议在 @Scheduled 定时任务中调用，
+     * 或使用异步方式优化。
+     */
+    public void syncTodayCommitStats() {
+        // 1. 获取今日提交列表（仅基础信息，不含 stats）
+        List<GithubCommitDTO> commits = githubService.getTodayCommits();
+
+        // 2. 遍历每一条提交
+        for (GithubCommitDTO commit : commits) {
+            String sha = commit.getSha();
+
+            // 检查是否已同步过，避免重复插入（基于唯一 SHA）
+            if (repository.existsByCommitSha(sha)) {
+                continue;   // 已存在则跳过
+            }
+
+            // 3. 获取该提交的详细信息（包含变更统计）
+            GithubCommitDetailDTO detail = githubService.getCommitDetail(sha);
+
+            // 4. 构建实体对象
+            CommitStat stat = new CommitStat();
+
+            // 提交唯一标识
+            stat.setCommitSha(sha);
+
+            // 提交消息（从嵌套的 commit 对象中获取）
+            stat.setCommitMessage(commit.getCommit().getMessage());
+
+            // 变更统计：新增行数
+            stat.setAdditions(detail.getStats().getAdditions());
+
+            // 变更统计：删除行数
+            stat.setDeletions(detail.getStats().getDeletions());
+
+            // 变更统计：总变更行数（新增 + 删除）
+            stat.setTotalChanges(detail.getStats().getTotal());
+
+            // 提交时间：从提交的作者信息中获取日期，格式为 "2026-06-26T10:30:00Z"
+            // 去掉末尾的 "Z"，然后解析为 LocalDateTime（UTC 时间，但存储时不带时区）
+            String dateStr = commit.getCommit().getAuthor().getDate().replace("Z", "");
+            stat.setCommitTime(LocalDateTime.parse(dateStr));
+
+            // 记录当前同步时间（即记录创建时间）
+            stat.setCreatedAt(LocalDateTime.now());
+
+            // 5. 持久化到数据库
+            repository.save(stat);
+        }
+    }
+}
+

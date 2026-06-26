@@ -13,10 +13,9 @@ import org.hanxingfeng.blog.Mapper.SummaryWritingMapper;
 import org.hanxingfeng.blog.Mapper.UserMapper;
 import org.hanxingfeng.blog.Mapper.WritingsMapper;
 import org.hanxingfeng.blog.Service.SummaryWritingService;
-import org.hanxingfeng.blog.other.JWTUtil;
-import org.hanxingfeng.blog.other.UpdateNowData;
+import org.hanxingfeng.blog.UtilAndOther.JWTUtil;
+import org.hanxingfeng.blog.UtilAndOther.UpdateNowData;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,13 +23,10 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.ToDoubleBiFunction;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 @Slf4j
 @RestController
