@@ -63,6 +63,12 @@ class BlogApplicationTests {
     @Value("${github.username}")
     private String username;
 
+    @Autowired
+    private RepoConfig repoConfig;
+    public void getRepo () {
+        List<String> repos = repoConfig.getRepo();
+    }
+
 
     @Test
     void contextLoads() throws Exception {
@@ -120,7 +126,6 @@ class BlogApplicationTests {
                 .bodyToFlux(GithubCommitDTO.class)
                 .collectList()
                 .block();
-        // TODO:测试通过
         GithubCommitDetailDTO re = githubWebClient.get()
                 .uri("/repos/{owner}/{repo}/commits/{sha}",
                         owner, "blog", "b73d4402a34909a768e60cbe015671efce4882ab")    // 按顺序填充三个占位符

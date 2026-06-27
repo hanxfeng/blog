@@ -4,10 +4,11 @@ import jakarta.persistence.*;
 import lombok.Data;
 import jakarta.persistence.Id;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "commit_stat")
+@Table(name = "git_commit")
 @Data
 public class CommitStat {
 
@@ -26,7 +27,7 @@ public class CommitStat {
 
     private Integer totalChanges;
 
-    private LocalDateTime commitTime;
+    private LocalDate commitTime;
 
     private LocalDateTime createdAt;
 }

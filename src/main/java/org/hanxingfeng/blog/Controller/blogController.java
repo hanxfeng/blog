@@ -8,11 +8,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.extern.slf4j.Slf4j;
-import org.hanxingfeng.blog.Entity.NodeCount;
-import org.hanxingfeng.blog.Entity.R;
-import org.hanxingfeng.blog.Entity.SummaryWriting;
-import org.hanxingfeng.blog.Entity.Writings;
+import org.hanxingfeng.blog.Entity.*;
 import org.hanxingfeng.blog.Mapper.BlogMapper;
+import org.hanxingfeng.blog.Mapper.CommitCountMapper;
 import org.hanxingfeng.blog.Mapper.SummaryWritingMapper;
 import org.hanxingfeng.blog.Mapper.WritingsMapper;
 import org.hanxingfeng.blog.UtilAndOther.UpdateNowData;
@@ -49,6 +47,9 @@ public class blogController {
 
     @Autowired
     private WritingsMapper writingsMapper;
+
+    @Autowired
+    private CommitCountMapper commitCountMapper;
 
     // 只在当前类用，不影响其他地方的旧 ObjectMapper
     private final ObjectMapper list2NodeCountMapper = new ObjectMapper()
@@ -173,7 +174,7 @@ public class blogController {
         if (writing == null) {
             rWriting = writingsMapper.selectById(id);
             String stringWriting = objectMapper.writeValueAsString(rWriting);
-            redisTemplate.opsForValue().set("Writing" + id.toString(), stringWriting);
+            redisTemplate.opsForValue().set("Writing" + id, stringWriting);
         }
         else {
             rWriting = objectMapper.readValue(writing, Writings.class);
@@ -195,4 +196,38 @@ public class blogController {
 
         return R.success(re);
     }
+
+
+    @GetMapping("/selectOneCommitCount")
+    public R<CommitCount> selectOneCommitCount() throws JsonProcessingException {
+        // 先查 redis
+        LocalDate yesterday = LocalDate.now().minusDays(1);
+        String key = "CommitCount:" + yesterday;
+        Object jsonData = redisTemplate.opsForValue().get(key);
+        CommitCount re;
+        // 判断是否有数据
+        if (jsonData == null) {
+            LambdaQueryWrapper<CommitCount> qw = new LambdaQueryWrapper<>();
+            qw.eq(CommitCount::getCommitTime, yesterday);
+            CommitCount cc =commitCountMapper.selectOne(qw);
+
+            // 如果数据库也没有数据则返回错误信息
+            if (cc == null) {
+                return R.error("数据异常");
+            }
+            re = cc;
+
+            String redisData = objectMapper.writeValueAsString(re);
+            redisTemplate.opsForValue().set(key, redisData);
+
+        }
+        else {
+            re = objectMapper.readValue(jsonData.toString(), CommitCount.class);
+        }
+
+        return R.success(re);
+    }
+
+    // TODO：添加获取所有数据接口
+    // TODO：主页只展示代码，但在左侧新增一个详细信息按钮，点击后展示总的笔记数量和代码修改数量
 }

@@ -2,16 +2,20 @@ package org.hanxingfeng.blog.UtilAndOther;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.util.Date;
-import static org.hanxingfeng.blog.Entity.SystemConstants.SECRET;
+
 
 @Component
 public class JWTUtil {
     // 随机生成的 key
+
+    @Value("${SECRET}")
+    private String SECRET;
 
     private final Key key =
             Keys.hmacShaKeyFor(
