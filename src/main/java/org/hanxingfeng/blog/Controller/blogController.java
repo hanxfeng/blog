@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 
 
 import java.time.LocalDate;
+import java.time.Year;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -173,12 +174,15 @@ public class blogController {
         Writings rWriting;
         if (writing == null) {
             rWriting = writingsMapper.selectById(id);
-            String stringWriting = objectMapper.writeValueAsString(rWriting);
-            redisTemplate.opsForValue().set("Writing" + id, stringWriting);
         }
         else {
             rWriting = objectMapper.readValue(writing, Writings.class);
         }
+        rWriting.setViewCount(rWriting.getViewCount() + 1);
+        writingsMapper.updateById(rWriting);
+        String stringWriting = objectMapper.writeValueAsString(rWriting);
+        redisTemplate.opsForValue().set("Writing" + id, stringWriting);
+
         return R.success(rWriting);
     }
 
@@ -187,14 +191,21 @@ public class blogController {
      * @param keyLike
      * @return
      */
-    // TODO：实现分页并进行测试
+    // TODO:在前端增加相关功能
     @PostMapping("/selectWriting")
-    public R<List<SummaryWriting>> selectWriting(String keyLike) {
+    public R<Page<SummaryWriting>> selectWriting(
+            String keyLike,
+            @RequestParam(defaultValue = "1") Integer pageNum,
+            @RequestParam(defaultValue = "10") Integer pageSize) {
+
+        Page<SummaryWriting> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<SummaryWriting> qw = new LambdaQueryWrapper<>();
         qw.like(SummaryWriting::getTitle, keyLike);
-        List<SummaryWriting> re = summaryWritingMapper.selectList(qw);
+        // 可选：添加排序
+        qw.orderByDesc(SummaryWriting::getDate);
 
-        return R.success(re);
+        Page<SummaryWriting> result = summaryWritingMapper.selectPage(page, qw);
+        return R.success(result);
     }
 
 
@@ -228,6 +239,39 @@ public class blogController {
         return R.success(re);
     }
 
-    // TODO：添加获取所有数据接口
+    @GetMapping("/selectAllCommit")
+    public R<List<CommitCount>> selectAllCommit() throws JsonProcessingException {
+        String key = "CommitDataList:";
+        String redisData = redisTemplate.opsForValue().get(key);
+
+        if (redisData != null) {
+            try {
+                List<CommitCount> re = list2NodeCountMapper.readValue(
+                        redisData, new TypeReference<>() {
+                        }
+                );
+                log.info("Redis 中获取历史笔记数据");
+                return R.success(re);
+            } catch (Exception e) {
+                log.info("缓存数据损坏");
+            }
+
+        } else {
+            LocalDate startTime = Year.now().atDay(1);
+            LocalDate endTime = LocalDate.now().minusDays(1);
+
+            LambdaQueryWrapper<CommitCount> qw = new LambdaQueryWrapper<>();
+            qw.between(CommitCount::getCommitTime, startTime, endTime);
+            List<CommitCount> re = commitCountMapper.selectList(qw);
+
+            String json = list2NodeCountMapper.writeValueAsString(re);
+            redisTemplate.opsForValue().set(key, json, 30, TimeUnit.MINUTES);
+            return R.success(re);
+        }
+
+        return R.error("未知错误");
+
+
+    }
     // TODO：主页只展示代码，但在左侧新增一个详细信息按钮，点击后展示总的笔记数量和代码修改数量
 }

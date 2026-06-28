@@ -22,4 +22,7 @@ public class SummaryWriting {
     // 时间
     private LocalDate date;
 
+    // 是否置顶
+    private int isTop;
+
 }

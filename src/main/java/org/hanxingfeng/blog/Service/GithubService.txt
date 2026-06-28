@@ -18,7 +18,7 @@ import java.util.List;
 // 假设这些类位于以下包中（根据实际项目调整）
 import org.hanxingfeng.blog.dto.GithubCommitDTO;      // GitHub 提交列表项 DTO
 import org.hanxingfeng.blog.dto.GithubCommitDetailDTO; // GitHub 提交详情 DTO
-import org.hanxingfeng.blog.Entity.CommitStat;         // 提交统计实体
+import org.hanxingfeng.blog.Entity.GitCommit;         // 提交统计实体
 
 
 /**
@@ -141,7 +141,7 @@ public class CommitStatService {
             stat.setCommitSha(sha);
 
             // 提交消息（从嵌套的 commit 对象中获取）
-            stat.setCommitMessage(commit.getCommit().getMessage());
+            stat.setCommitMessage(commit.gitCommit().getMessage());
 
             // 变更统计：新增行数
             stat.setAdditions(detail.getStats().getAdditions());
@@ -154,7 +154,7 @@ public class CommitStatService {
 
             // 提交时间：从提交的作者信息中获取日期，格式为 "2026-06-26T10:30:00Z"
             // 去掉末尾的 "Z"，然后解析为 LocalDateTime（UTC 时间，但存储时不带时区）
-            String dateStr = commit.getCommit().getAuthor().getDate().replace("Z", "");
+            String dateStr = commit.gitCommit().getAuthor().getDate().replace("Z", "");
             stat.setCommitTime(LocalDateTime.parse(dateStr));
 
             // 记录当前同步时间（即记录创建时间）

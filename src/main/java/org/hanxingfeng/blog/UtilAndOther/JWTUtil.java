@@ -2,6 +2,7 @@ package org.hanxingfeng.blog.UtilAndOther;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -17,10 +18,12 @@ public class JWTUtil {
     @Value("${SECRET}")
     private String SECRET;
 
-    private final Key key =
-            Keys.hmacShaKeyFor(
-                    SECRET.getBytes(StandardCharsets.UTF_8)
-            );
+    private Key key;
+
+    @PostConstruct
+    private void init() {
+        this.key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
+    }
 
     /**
      * 用于生成 token

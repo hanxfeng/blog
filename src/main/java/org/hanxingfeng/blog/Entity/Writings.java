@@ -24,4 +24,7 @@ public class Writings {
 
     // 时间
     private LocalDate date;
+
+    // 点击量
+    private int viewCount;
 }

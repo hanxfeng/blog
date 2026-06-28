@@ -62,9 +62,6 @@ public class userController {
 
     // TODO：添加在线写作功能
     // TODO：新增关于我页面
-    // TODO：友情链接
-    // TODO：文章置顶功能
-    // TODO：访问量统计功能
 
     /**
      * 用于进行登录
@@ -267,6 +264,33 @@ public class userController {
 
 
         return R.success("修改成功");
+    }
+
+    /**
+     * 用于置顶或取消置顶文章
+     * @param id 要置顶的文章的 id
+     * @param isTop 1 为置顶，0 为取消置顶
+     * @return 操作结果
+     */
+    @GetMapping("/topWriting/{id}/{isTop}")
+    public R<String> topWriting(@PathVariable int id, @PathVariable int isTop) {
+        try {
+            SummaryWriting sw = summaryWritingMapper.selectById(id);
+            int oldIsTop = sw.getIsTop();
+            if (oldIsTop == isTop && isTop == 1) {
+                return R.error("该文章已被置顶");
+            }
+            if (oldIsTop == isTop && isTop == 0) {
+                return R.error("该文章未被置顶，不能取消置顶");
+            }
+            sw.setIsTop(isTop);
+            summaryWritingMapper.updateById(sw);
+            return R.success("操作成功");
+        }
+        catch (Exception e) {
+            return R.error("出现错误，请联系管理员处理");
+        }
+
     }
 
 }

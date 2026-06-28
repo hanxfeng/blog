@@ -2,7 +2,7 @@ package org.hanxingfeng.blog.UtilAndOther;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.extern.slf4j.Slf4j;
-import org.hanxingfeng.blog.Entity.CommitStat;
+import org.hanxingfeng.blog.Entity.GitCommit;
 import org.hanxingfeng.blog.Mapper.CommitStatMapper;
 import org.hanxingfeng.blog.config.RepoConfig;
 import org.hanxingfeng.blog.dto.GithubCommitDTO;
@@ -91,26 +91,27 @@ public class getGitHubCommit {
             for (GithubCommitDTO commit : commits) {
                 String sha = commit.getSha();
 
-                LambdaQueryWrapper<CommitStat> qw = new LambdaQueryWrapper<>();
-                qw.eq(CommitStat::getCommitSha, sha);
-                CommitStat re = commitStatMapper.selectOne(qw);
+                LambdaQueryWrapper<GitCommit> qw = new LambdaQueryWrapper<>();
+                qw.eq(GitCommit::getCommitSha, sha);
+                GitCommit re = commitStatMapper.selectOne(qw);
                 if (re != null) {
                     continue;
                 }
 
                 GithubCommitDetailDTO detail = getCommitDetail(sha, repo);
 
-                CommitStat commitStat = new CommitStat();
-                commitStat.setCommitSha(sha);
-                commitStat.setCommitMessage(commit.getCommit().getMessage());
-                commitStat.setAdditions(detail.getStats().getAdditions());
-                commitStat.setDeletions(detail.getStats().getDeletions());
-                commitStat.setTotalChanges(detail.getStats().getTotal());
+                GitCommit gitCommit = new GitCommit();
+                gitCommit.setRepoName(repo);
+                gitCommit.setCommitSha(sha);
+                gitCommit.setCommitMessage(commit.getCommit().getMessage());
+                gitCommit.setAddtions(detail.getStats().getAdditions());
+                gitCommit.setDeletions(detail.getStats().getDeletions());
+                gitCommit.setTotalChanges(detail.getStats().getTotal());
                 String dateStr = commit.getCommit().getAuthor().getDate().replace("Z", "");
-                commitStat.setCommitTime(LocalDate.parse(dateStr));
-                commitStat.setCreatedAt(LocalDateTime.now());
+                gitCommit.setCommitTime(LocalDate.parse(dateStr));
+                gitCommit.setCreatedAt(LocalDateTime.now());
 
-                commitStatMapper.insert(commitStat);
+                commitStatMapper.insert(gitCommit);
             }
         }
     }
