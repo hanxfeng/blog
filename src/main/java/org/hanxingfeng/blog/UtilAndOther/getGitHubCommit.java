@@ -2,7 +2,9 @@ package org.hanxingfeng.blog.UtilAndOther;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.extern.slf4j.Slf4j;
+import org.hanxingfeng.blog.Entity.CommitCount;
 import org.hanxingfeng.blog.Entity.GitCommit;
+import org.hanxingfeng.blog.Mapper.CommitCountMapper;
 import org.hanxingfeng.blog.Mapper.CommitStatMapper;
 import org.hanxingfeng.blog.config.RepoConfig;
 import org.hanxingfeng.blog.dto.GithubCommitDTO;
@@ -37,6 +39,9 @@ public class getGitHubCommit {
 
     @Autowired
     private CommitStatMapper commitStatMapper;
+
+    @Autowired
+    private CommitCountMapper commitCountMapper;
 
 
     /**
@@ -82,9 +87,12 @@ public class getGitHubCommit {
     /**
      * 获取并保存今日数据
      */
-    @Retryable(maxAttempts = 144, backoff = @Backoff(delay = 600000))
+    // @Retryable(maxAttempts = 144, backoff = @Backoff(delay = 600000))
     public void CommitStatService() {
         List<String> repos = repoConfig.getRepo();
+        int additions = 0;
+        int deletions = 0;
+        int totalChanges = 0;
         for (String repo : repos) {
             List<GithubCommitDTO> commits = getYesterdayCommits(repo);
 
@@ -105,14 +113,40 @@ public class getGitHubCommit {
                 gitCommit.setCommitSha(sha);
                 gitCommit.setCommitMessage(commit.getCommit().getMessage());
                 gitCommit.setAddtions(detail.getStats().getAdditions());
+                additions += detail.getStats().getAdditions();
                 gitCommit.setDeletions(detail.getStats().getDeletions());
+                deletions += detail.getStats().getDeletions();
                 gitCommit.setTotalChanges(detail.getStats().getTotal());
+                totalChanges += detail.getStats().getTotal();
                 String dateStr = commit.getCommit().getAuthor().getDate().replace("Z", "");
-                gitCommit.setCommitTime(LocalDate.parse(dateStr));
+                LocalDateTime dateTime = LocalDateTime.parse(dateStr);
+                LocalDate date = dateTime.toLocalDate();
+                gitCommit.setCommitTime(date);
                 gitCommit.setCreatedAt(LocalDateTime.now());
 
                 commitStatMapper.insert(gitCommit);
             }
         }
+
+        LocalDate date = LocalDate.now().minusDays(1);
+        LambdaQueryWrapper<CommitCount> qw = new LambdaQueryWrapper<>();
+        qw.eq(CommitCount::getCommitTime, date);
+        CommitCount cc = commitCountMapper.selectOne(qw);
+        if (cc == null) {
+            cc = new CommitCount();
+            cc.setAdditions(additions);
+            cc.setDeletions(deletions);
+            cc.setTotalChanges(totalChanges);
+            cc.setCommitTime(date);
+            commitCountMapper.insert(cc);
+        }
+        else {
+            cc.setAdditions(additions);
+            cc.setDeletions(deletions);
+            cc.setTotalChanges(totalChanges);
+            cc.setCommitTime(date);
+            commitCountMapper.updateById(cc);
+        }
+
     }
 }

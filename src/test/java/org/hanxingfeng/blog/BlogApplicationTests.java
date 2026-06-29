@@ -16,6 +16,8 @@ import org.hanxingfeng.blog.Mapper.CommitStatMapper;
 import org.hanxingfeng.blog.Mapper.UserMapper;
 import org.hanxingfeng.blog.Mapper.WritingsMapper;
 import org.hanxingfeng.blog.UtilAndOther.UpdateNowData;
+import org.hanxingfeng.blog.UtilAndOther.getGitHubCommit;
+import org.hanxingfeng.blog.UtilAndOther.saveoneRepo;
 import org.hanxingfeng.blog.config.RepoConfig;
 import org.hanxingfeng.blog.dto.GithubCommitDTO;
 import org.hanxingfeng.blog.dto.GithubCommitDetailDTO;
@@ -24,6 +26,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -61,6 +64,9 @@ class BlogApplicationTests {
     @Autowired
     private WebClient githubWebClient;
 
+    @Autowired
+    private saveoneRepo saveoneRepo;
+
     // 从 application.yml/properties 读取仓库所有者、仓库名和用户名
     @Value("${github.owner}")
     private String owner;
@@ -80,6 +86,9 @@ class BlogApplicationTests {
     public void getRepo () {
         List<String> repos = repoConfig.getRepo();
     }
+
+    @Autowired
+    private getGitHubCommit getGitHubCommit;
 
 
     @Test
@@ -238,84 +247,9 @@ class BlogApplicationTests {
     }
 
 
-    // TODO：因网络原因未能执行成功
     @Test
     void saveCommitTestSingleRepo() {
-        String repo = "javaPractice";
-        LocalDate start = LocalDate.of(2026, 1, 1);
-        LocalDate end = LocalDate.now(ZoneOffset.UTC).minusDays(1);
-
-        for (LocalDate date = start; !date.isAfter(end); date = date.plusDays(1)) {
-            String since = date.atStartOfDay(ZoneOffset.UTC).toInstant().toString();
-            String until = date.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant().toString();
-
-            int dayAdditions = 0;
-            int dayDeletions = 0;
-            int dayTotal = 0;
-
-            List<GithubCommitDTO> commits = githubWebClient.get()
-                    .uri(uriBuilder -> uriBuilder
-                            .path("/repos/{owner}/{repo}/commits")
-                            .queryParam("author", username)
-                            .queryParam("since", since)
-                            .queryParam("until", until)
-                            .build(owner, repo))
-                    .retrieve()
-                    .bodyToFlux(GithubCommitDTO.class)
-                    .collectList()
-                    .block();
-
-            if (commits != null) {
-                for (GithubCommitDTO commit : commits) {
-                    String sha = commit.getSha();
-
-                    LambdaQueryWrapper<GitCommit> qw = new LambdaQueryWrapper<>();
-                    qw.eq(GitCommit::getCommitSha, sha);
-                    if (commitStatMapper.selectOne(qw) != null) {
-                        continue;
-                    }
-
-                    GithubCommitDetailDTO detail = githubWebClient.get()
-                            .uri("/repos/{owner}/{repo}/commits/{sha}", owner, repo, sha)
-                            .retrieve()
-                            .bodyToMono(GithubCommitDetailDTO.class)
-                            .block();
-
-                    GitCommit gitCommit = new GitCommit();
-                    gitCommit.setRepoName(repo);
-                    gitCommit.setCommitSha(sha);
-                    gitCommit.setCommitMessage(commit.getCommit().getMessage());
-                    if (detail != null && detail.getStats() != null) {
-                        gitCommit.setAddtions(detail.getStats().getAdditions());
-                        gitCommit.setDeletions(detail.getStats().getDeletions());
-                        gitCommit.setTotalChanges(detail.getStats().getTotal());
-                        dayAdditions += detail.getStats().getAdditions() != null ? detail.getStats().getAdditions() : 0;
-                        dayDeletions += detail.getStats().getDeletions() != null ? detail.getStats().getDeletions() : 0;
-                        dayTotal += detail.getStats().getTotal() != null ? detail.getStats().getTotal() : 0;
-                    }
-                    gitCommit.setCommitTime(date);
-                    gitCommit.setCreatedAt(LocalDateTime.now());
-                    commitStatMapper.insert(gitCommit);
-                }
-            }
-
-            LambdaQueryWrapper<CommitCount> countQw = new LambdaQueryWrapper<>();
-            countQw.eq(CommitCount::getCommitTime, date);
-            CommitCount existingCount = commitCountMapper.selectOne(countQw);
-            if (existingCount != null) {
-                existingCount.setAdditions(existingCount.getAdditions() + dayAdditions);
-                existingCount.setDeletions(existingCount.getDeletions() + dayDeletions);
-                existingCount.setTotalChanges(existingCount.getTotalChanges() + dayTotal);
-                commitCountMapper.updateById(existingCount);
-            } else {
-                CommitCount commitCount = new CommitCount();
-                commitCount.setAdditions(dayAdditions);
-                commitCount.setDeletions(dayDeletions);
-                commitCount.setTotalChanges(dayTotal);
-                commitCount.setCommitTime(date);
-                commitCountMapper.insert(commitCount);
-            }
-        }
+        getGitHubCommit.CommitStatService();
     }
 
 }

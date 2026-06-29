@@ -1,12 +1,14 @@
 package org.hanxingfeng.blog.Controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import jakarta.persistence.criteria.CriteriaBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.hanxingfeng.blog.Entity.*;
 import org.hanxingfeng.blog.Mapper.BlogMapper;
@@ -19,9 +21,11 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.Year;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static org.hanxingfeng.blog.Entity.SystemConstants.START_TIME;
@@ -62,9 +66,9 @@ public class blogController {
      * @return
      * @throws Exception
      */
-    @GetMapping("/selectNow")
+    @GetMapping("/selectYesterday")
     public R<NodeCount> selectNow() throws Exception {
-        log.info("开始执行 selectNow");
+        log.info("开始执行 selectYesterday");
         NodeCount nodeCount = new NodeCount();
         // 1. 从redis中获取数据
         LocalDate yesterdayDate = LocalDate.now().minusDays(1);
@@ -191,7 +195,6 @@ public class blogController {
      * @param keyLike
      * @return
      */
-    // TODO:在前端增加相关功能
     @PostMapping("/selectWriting")
     public R<Page<SummaryWriting>> selectWriting(
             String keyLike,
@@ -208,7 +211,11 @@ public class blogController {
         return R.success(result);
     }
 
-
+    /**
+     * 获取昨日提交数据
+     * @return
+     * @throws JsonProcessingException
+     */
     @GetMapping("/selectOneCommitCount")
     public R<CommitCount> selectOneCommitCount() throws JsonProcessingException {
         // 先查 redis
@@ -239,6 +246,11 @@ public class blogController {
         return R.success(re);
     }
 
+    /**
+     * 获取所有修改代码行数
+     * @return
+     * @throws JsonProcessingException
+     */
     @GetMapping("/selectAllCommit")
     public R<List<CommitCount>> selectAllCommit() throws JsonProcessingException {
         String key = "CommitDataList:";
@@ -273,5 +285,16 @@ public class blogController {
 
 
     }
-    // TODO：主页只展示代码，但在左侧新增一个详细信息按钮，点击后展示总的笔记数量和代码修改数量
+
+    /**
+     * 用于获取总代码修改行数
+     * @return
+     */
+    @GetMapping("/sumCommit")
+    public R<BigDecimal> sumCommit() {
+        QueryWrapper<CommitCount> qw = new QueryWrapper<>();
+        qw.select("SUM(total_changes) as commit_count");
+        Map<String, Object> map = commitCountMapper.selectMaps(qw).get(0);
+        return R.success((BigDecimal) map.get("commit_count"));
+    }
 }
