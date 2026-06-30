@@ -15,6 +15,7 @@ import org.hanxingfeng.blog.Mapper.WritingsMapper;
 import org.hanxingfeng.blog.Service.SummaryWritingService;
 import org.hanxingfeng.blog.UtilAndOther.JWTUtil;
 import org.hanxingfeng.blog.UtilAndOther.UpdateNowData;
+import org.hanxingfeng.blog.UtilAndOther.getGitHubCommit;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -27,7 +28,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
-
+import java.util.concurrent.TimeUnit;
+// TODO:对管理员界面的页面也进行相应更新
 @Slf4j
 @RestController
 @RequestMapping("/admin")
@@ -60,6 +62,9 @@ public class userController {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private getGitHubCommit getGitHubCommit;
+
     // TODO：添加在线写作功能
 
 
@@ -74,12 +79,13 @@ public class userController {
         Long count;
         if (result == null) {
             count = 1L;
-            redisTemplate.opsForValue().set(key, String.valueOf(count));
+            redisTemplate.opsForValue().set(key, String.valueOf(count), 1, TimeUnit.HOURS);
         }
         else {
             count = Long.valueOf(result);
+            if (count >= 5) {
             return R.error("尝试次数过多请一小时后再试或联系管理员处理");
-        }
+        }}
 
 
         String userName = user.getUserName();
@@ -90,7 +96,7 @@ public class userController {
         qw.eq(User::getUserName, userName);
         User sqlUser = userMapper.selectOne(qw);
 
-        if (sqlUser == null || passwordEncoder.matches(password, sqlUser.getPassword())) {
+        if (sqlUser == null || !passwordEncoder.matches(password, sqlUser.getPassword())) {
             redisTemplate.opsForValue().set(key, String.valueOf(count + 1));
             return R.error("用户不存在或密码错误！");
         }
@@ -108,13 +114,14 @@ public class userController {
     }
 
     /**
-     *用于更新今日数据
+     *用于更新昨日数据
      * &#064;return：返回是否更新成功
      */
     @GetMapping("/update")
     public R<String> update () throws Exception {
         log.info("开始更新数据");
         updateNowData.updateNoteData();
+        getGitHubCommit.CommitStatService();
         return R.success("更新数据成功");
     }
 
@@ -229,12 +236,14 @@ public class userController {
     /**
      * 对文章内容进行修改
      * @param writings
+     * @param upOrIn 用于标识是插入新文章还是更新旧文章，0 为插入 1 为更新
      * @return
      * @throws JsonProcessingException
      */
     @Transactional
     @PostMapping("/updateWritingById")
-    public R<String> updateWritingById(@RequestBody Writings writings) throws JsonProcessingException {
+    public R<String> updateWritingById(@RequestBody Writings writings
+    , @RequestParam(value="upOrIn", required = false) Integer upOrIn) throws JsonProcessingException {
         log.info("开始对文章进行修改");
 
         // 更新文章摘要
@@ -252,16 +261,25 @@ public class userController {
 
         // 更新文章类的摘要信息
         writings.setPreview(preview);
-
-        writingsMapper.updateById(writings);
-        summaryWritingMapper.updateById(summaryWriting);
+        if (upOrIn == null || upOrIn == 0) {
+            writingsMapper.insert(writings);
+            // insert 后 MyBatis-Plus 自动回填 writings.id，同步到 summaryWriting 保证两表 ID 一致
+            summaryWriting.setId(writings.getId());
+            summaryWriting.setDate(LocalDate.now());
+            summaryWritingMapper.insert(summaryWriting);
+        }
+        else if (upOrIn == 1) {
+            writingsMapper.updateById(writings);
+            summaryWritingMapper.updateById(summaryWriting);
+        }
+        else {
+            return R.error("出现未知错误，请联系管理员");
+        }
 
         // 更新在 Redis 中的数据
         String key = "Writing" + writings.getId().toString();
         String rStringData = objectMapper.writeValueAsString(writings);
         redisTemplate.opsForValue().set(key, rStringData);
-
-
 
         return R.success("修改成功");
     }
@@ -275,6 +293,8 @@ public class userController {
     @GetMapping("/topWriting/{id}/{isTop}")
     public R<String> topWriting(@PathVariable int id, @PathVariable int isTop) {
         try {
+            log.info("开始对文章进行置顶或取消置顶，id 为：{}", id);
+            String key = "PageSummaryWriting";
             SummaryWriting sw = summaryWritingMapper.selectById(id);
             int oldIsTop = sw.getIsTop();
             if (oldIsTop == isTop && isTop == 1) {
@@ -285,6 +305,7 @@ public class userController {
             }
             sw.setIsTop(isTop);
             summaryWritingMapper.updateById(sw);
+            redisTemplate.delete(key);
             return R.success("操作成功");
         }
         catch (Exception e) {

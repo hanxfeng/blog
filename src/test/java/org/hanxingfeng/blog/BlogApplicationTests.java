@@ -162,6 +162,7 @@ class BlogApplicationTests {
         System.out.println(re.toString());
     }
 
+
     @Test
     void saveCommitTest() {
         LocalDate start = LocalDate.of(2026, 1, 1);
@@ -246,7 +247,9 @@ class BlogApplicationTests {
         }
     }
 
-
+    /**
+     * 手动进行昨日数据更新
+     */
     @Test
     void saveCommitTestSingleRepo() {
         getGitHubCommit.CommitStatService();

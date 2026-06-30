@@ -147,7 +147,7 @@ public class blogController {
         log.info("开始获取文章摘要");
 
         // 尝试从 Redis 中获取数据
-        String key = "PageSummaryWriting:current=" + current + "size:9";
+        String key = "PageSummaryWriting";
         String data = redisTemplate.opsForValue().get(key);
 
         if (data != null) {
@@ -219,6 +219,7 @@ public class blogController {
     @GetMapping("/selectOneCommitCount")
     public R<CommitCount> selectOneCommitCount() throws JsonProcessingException {
         // 先查 redis
+        log.info("开始获取昨日提交数据");
         LocalDate yesterday = LocalDate.now().minusDays(1);
         String key = "CommitCount:" + yesterday;
         Object jsonData = redisTemplate.opsForValue().get(key);
@@ -253,6 +254,7 @@ public class blogController {
      */
     @GetMapping("/selectAllCommit")
     public R<List<CommitCount>> selectAllCommit() throws JsonProcessingException {
+        log.info("开始获取所有代码修改行数");
         String key = "CommitDataList:";
         String redisData = redisTemplate.opsForValue().get(key);
 
@@ -292,6 +294,7 @@ public class blogController {
      */
     @GetMapping("/sumCommit")
     public R<BigDecimal> sumCommit() {
+        log.info("开始获取总代码修改行数");
         QueryWrapper<CommitCount> qw = new QueryWrapper<>();
         qw.select("SUM(total_changes) as commit_count");
         Map<String, Object> map = commitCountMapper.selectMaps(qw).get(0);

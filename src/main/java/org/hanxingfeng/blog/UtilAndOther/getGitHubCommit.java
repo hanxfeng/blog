@@ -85,10 +85,11 @@ public class getGitHubCommit {
     }
 
     /**
-     * 获取并保存今日数据
+     * 获取并保存昨日数据
      */
-    // @Retryable(maxAttempts = 144, backoff = @Backoff(delay = 600000))
+    @Retryable(maxAttempts = 144, backoff = @Backoff(delay = 600000))
     public void CommitStatService() {
+        log.info("开始统计 commit 数据");
         List<String> repos = repoConfig.getRepo();
         int additions = 0;
         int deletions = 0;
@@ -139,6 +140,7 @@ public class getGitHubCommit {
             cc.setTotalChanges(totalChanges);
             cc.setCommitTime(date);
             commitCountMapper.insert(cc);
+
         }
         else {
             cc.setAdditions(additions);
@@ -147,6 +149,6 @@ public class getGitHubCommit {
             cc.setCommitTime(date);
             commitCountMapper.updateById(cc);
         }
-
+        log.info("获取成功");
     }
 }
