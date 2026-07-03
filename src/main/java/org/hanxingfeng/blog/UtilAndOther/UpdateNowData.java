@@ -29,9 +29,6 @@ import static org.hanxingfeng.blog.Entity.SystemConstants.mdFilePath;
 public class UpdateNowData {
 
     @Autowired
-    private StringRedisTemplate redisTemplate;
-
-    @Autowired
     private BlogMapper blogMapper;
 
     @Autowired
@@ -170,33 +167,21 @@ public class UpdateNowData {
         // 获取当前时间
         LocalDate yesterday = LocalDate.now().minusDays(1);
         // 获取昨天的总笔记数和总字数
-        Object yesterdayTotalCountString = redisTemplate.opsForValue().get(yesterday.toString());
-
-
-        // 如果 Redis 中没有数据，则从数据库中查询
         LocalDate nowDate = LocalDate.now();
         int yesterdayTotalNoteCount = 0;
         int yesterdayTotalNoteWordCount = 0;
 
-        if (yesterdayTotalCountString == null) {
-            log.info("使用数据库进行查询");
-            LambdaQueryWrapper<NodeCount> qw = new LambdaQueryWrapper<>();
-            qw.eq(NodeCount::getTodayTime, yesterday);
-            NodeCount yesterdayNodeCount = blogMapper.selectOne(qw);
-            // 判断数据是否存在
-            if (yesterdayNodeCount == null) {
-                throw new Exception("未找到昨天的统计数据，请检查数据采集任务");
-            }
-            yesterdayTotalNoteCount = yesterdayNodeCount.getTotalNoteCount();
-            yesterdayTotalNoteWordCount = yesterdayNodeCount.getTotalNoteWordCount();
+        log.info("使用数据库进行查询");
+        LambdaQueryWrapper<NodeCount> qw = new LambdaQueryWrapper<>();
+        qw.eq(NodeCount::getTodayTime, yesterday);
+        NodeCount yesterdayNodeCount = blogMapper.selectOne(qw);
+        // 判断数据是否存在
+        if (yesterdayNodeCount == null) {
+            throw new Exception("未找到昨天的统计数据，请检查数据采集任务");
         }
-        else {
-            log.info("使用 Redis 进行查询");
-            NodeCount yesterdayTotalCount = objectMapper.readValue(yesterdayTotalCountString.toString(), NodeCount.class);
-            yesterdayTotalNoteCount = yesterdayTotalCount.getTotalNoteCount();
-            yesterdayTotalNoteWordCount = yesterdayTotalCount.getTotalNoteWordCount();
+        yesterdayTotalNoteCount = yesterdayNodeCount.getTotalNoteCount();
+        yesterdayTotalNoteWordCount = yesterdayNodeCount.getTotalNoteWordCount();
 
-        }
         log.info("昨日笔记数:{}, 昨日字数:{}", yesterdayTotalNoteCount, yesterdayTotalNoteWordCount);
 
 
@@ -224,31 +209,19 @@ public class UpdateNowData {
         nodeCount.setDailyNoteWordCount(nowNoteWordCount);
         nodeCount.setTodayTime(nowDate);
 
-        // 将数据转为 String 后写入 Redis
-        String jsonString = objectMapper.writeValueAsString(nodeCount);
-        redisTemplate.opsForValue().set(nowDate.toString(), jsonString);
 
         // 判断数据库中是否有数据，有则更新没有则新增
-        LambdaQueryWrapper<NodeCount> qw = new LambdaQueryWrapper<NodeCount>();
-        qw.eq(NodeCount::getTodayTime, nowDate);
-        NodeCount temp = blogMapper.selectOne(qw);
+        LambdaQueryWrapper<NodeCount> qw2 = new LambdaQueryWrapper<NodeCount>();
+        qw2.eq(NodeCount::getTodayTime, nowDate);
+        NodeCount temp = blogMapper.selectOne(qw2);
         if (temp == null) {
             blogMapper.insert(nodeCount);
         }
         else {
-            LambdaUpdateWrapper<NodeCount> qw2 = new LambdaUpdateWrapper<>();
-            qw2.eq(NodeCount::getTodayTime, nodeCount.getTodayTime());
-            blogMapper.update(nodeCount, qw2);
+            LambdaUpdateWrapper<NodeCount> qw3 = new LambdaUpdateWrapper<>();
+            qw3.eq(NodeCount::getTodayTime, nodeCount.getTodayTime());
+            blogMapper.update(nodeCount, qw3);
         }
-
-        // 更新 Redis 的 nodeCountList 中的数据
-        LambdaQueryWrapper<NodeCount> lqw = new LambdaQueryWrapper<>();
-        lqw.ge(NodeCount::getTodayTime, START_TIME);
-        List<NodeCount> re = blogMapper.selectList(lqw);
-
-        String json = list2NodeCountMapper.writeValueAsString(re);
-        redisTemplate.opsForValue().set("nodeCountList", json);
-
 
         return nodeCount;
 

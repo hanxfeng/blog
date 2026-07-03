@@ -69,23 +69,28 @@ public class blogController {
     @GetMapping("/selectYesterday")
     public R<NodeCount> selectNow() throws Exception {
         log.info("开始执行 selectYesterday");
-        NodeCount nodeCount = new NodeCount();
+        NodeCount nodeCount;
         // 1. 从redis中获取数据
-        LocalDate yesterdayDate = LocalDate.now().minusDays(1);
-        Object jsonData = redisTemplate.opsForValue().get(yesterdayDate.toString());
+        LocalDate key = LocalDate.now().minusDays(1);
+        Object jsonData = redisTemplate.opsForValue().get(key.toString());
 
         // 判断是否有数据
         if (jsonData == null) {
             // 没有则尝试从数据库中获取数据
             LambdaQueryWrapper<NodeCount> qw = new LambdaQueryWrapper<>();
-            qw.eq(NodeCount::getTodayTime, yesterdayDate);
-            NodeCount nowData = blogMapper.selectOne(qw);
+            qw.eq(NodeCount::getTodayTime, key);
+            NodeCount yesterdayData = blogMapper.selectOne(qw);
 
             // 如果数据库也没有数据则调用 updateNowData 方法
-            if (nowData == null) {
-                nowData = updateNowData.updateNoteData();
+            if (yesterdayData == null) {
+                yesterdayData = updateNowData.updateNoteData();
             }
-            nodeCount = nowData;
+
+            // 将数据保存至 Redis
+            String redisData = objectMapper.writeValueAsString(yesterdayData);
+            redisTemplate.opsForValue().set(key.toString(), redisData, 30, TimeUnit.MINUTES);
+
+            nodeCount = yesterdayData;
         }
         else {
             nodeCount = objectMapper.readValue(jsonData.toString(), NodeCount.class);
@@ -99,17 +104,17 @@ public class blogController {
      * @return
      */
     @GetMapping("/select")
-    public R<List<NodeCount>> select() {
+    public R<List<NodeCount>> select() throws JsonProcessingException {
         log.info("开始执行 select");
 
         // 先尝试在 redis 中获取数据
-        String CACHE_KEY = "nodeCountList";
-        String redisData = redisTemplate.opsForValue().get(CACHE_KEY);
+        String key = "nodeCountList";
+        String nodeCountList = redisTemplate.opsForValue().get(key);
 
-        if (redisData != null) {
+        if (nodeCountList != null) {
             try {
                 List<NodeCount> re = list2NodeCountMapper.readValue(
-                        redisData, new TypeReference<>() {
+                        nodeCountList, new TypeReference<>() {
                         }
                 );
                 log.info("Redis 中获取历史笔记数据");
@@ -123,6 +128,11 @@ public class blogController {
             lqw.ge(NodeCount::getTodayTime, START_TIME);
             List<NodeCount> re = blogMapper.selectList(lqw);
             log.info("MySQL 中获取历史笔记数据");
+
+            // 将数据写入 Redis
+            String redisData = list2NodeCountMapper.writeValueAsString(re);
+            redisTemplate.opsForValue().set(key, redisData, 30, TimeUnit.MINUTES);
+
             return R.success(re);
         }
 
@@ -175,19 +185,19 @@ public class blogController {
         log.info("获取id为：{}的文章",id);
         String writing = redisTemplate.opsForValue().get("Writing" + id.toString());
         // 如果 Redis 中不存在数据，则从数据库中查询并写入 Redis
-        Writings rWriting;
+        Writings returnWriting;
         if (writing == null) {
-            rWriting = writingsMapper.selectById(id);
+            returnWriting = writingsMapper.selectById(id);
         }
         else {
-            rWriting = objectMapper.readValue(writing, Writings.class);
+            returnWriting = objectMapper.readValue(writing, Writings.class);
         }
-        rWriting.setViewCount(rWriting.getViewCount() + 1);
-        writingsMapper.updateById(rWriting);
-        String stringWriting = objectMapper.writeValueAsString(rWriting);
-        redisTemplate.opsForValue().set("Writing" + id, stringWriting);
+        returnWriting.setViewCount(returnWriting.getViewCount() + 1);
+        writingsMapper.updateById(returnWriting);
+        String stringWriting = objectMapper.writeValueAsString(returnWriting);
+        redisTemplate.opsForValue().set("Writing" + id, stringWriting, 30, TimeUnit.MINUTES);
 
-        return R.success(rWriting);
+        return R.success(returnWriting);
     }
 
     /**
@@ -228,7 +238,7 @@ public class blogController {
         if (jsonData == null) {
             LambdaQueryWrapper<CommitCount> qw = new LambdaQueryWrapper<>();
             qw.eq(CommitCount::getCommitTime, yesterday);
-            CommitCount cc =commitCountMapper.selectOne(qw);
+            CommitCount cc = commitCountMapper.selectOne(qw);
 
             // 如果数据库也没有数据则返回错误信息
             if (cc == null) {
@@ -237,7 +247,7 @@ public class blogController {
             re = cc;
 
             String redisData = objectMapper.writeValueAsString(re);
-            redisTemplate.opsForValue().set(key, redisData);
+            redisTemplate.opsForValue().set(key, redisData, 30, TimeUnit.MINUTES);
 
         }
         else {
@@ -295,9 +305,23 @@ public class blogController {
     @GetMapping("/sumCommit")
     public R<BigDecimal> sumCommit() {
         log.info("开始获取总代码修改行数");
-        QueryWrapper<CommitCount> qw = new QueryWrapper<>();
-        qw.select("SUM(total_changes) as commit_count");
-        Map<String, Object> map = commitCountMapper.selectMaps(qw).get(0);
-        return R.success((BigDecimal) map.get("commit_count"));
+
+        String key = "sumCount";
+        String redisData = redisTemplate.opsForValue().get(key);
+
+        BigDecimal re;
+        if (redisData == null) {
+            QueryWrapper<CommitCount> qw = new QueryWrapper<>();
+            qw.select("SUM(total_changes) as commit_count");
+            Map<String, Object> map = commitCountMapper.selectMaps(qw).get(0);
+            re = (BigDecimal) map.get("commit_count");
+            redisTemplate.opsForValue().set(key, re.toString());
+        }
+        else {
+            re = new BigDecimal(redisData);
+        }
+
+
+        return R.success(re);
     }
 }
