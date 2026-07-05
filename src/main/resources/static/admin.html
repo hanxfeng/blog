@@ -229,7 +229,7 @@
     <!-- 视图 B: 管理界面 (包含文章编辑增强) -->
     <div id="admin-view" class="hidden fade-in">
         <!-- 管理操作工具栏 -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
             <div onclick="handleUpdateData()" class="glass-card p-4 rounded-xl shadow-lg flex items-center justify-between cursor-pointer hover:bg-white transition-all group">
                 <div class="flex items-center space-x-4">
                     <div class="p-3 bg-blue-50 rounded-lg group-hover:bg-blue-100 transition-colors">
@@ -246,6 +246,14 @@
                     <div><p class="text-sm font-bold text-gray-700">发布新文章</p><p class="text-[10px] text-gray-400">上传 MD 文件或在线写作</p></div>
                 </div>
                 <input type="file" id="md-upload" class="hidden" accept=".md" onchange="handleFileUpload(this)">
+            </div>
+            <div onclick="showNodePublishModal()" class="glass-card p-4 rounded-xl shadow-lg flex items-center justify-between cursor-pointer hover:bg-white transition-all group">
+                <div class="flex items-center space-x-4">
+                    <div class="p-3 bg-purple-50 rounded-lg group-hover:bg-purple-100 transition-colors">
+                        <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    </div>
+                    <div><p class="text-sm font-bold text-gray-700">上传笔记</p><p class="text-[10px] text-gray-400">批量或单篇上传到笔记库</p></div>
+                </div>
             </div>
         </div>
 
@@ -297,6 +305,56 @@
 
 <!-- 回到顶部按钮 -->
 <button class="back-to-top" id="back-to-top" onclick="scrollToTop()" title="回到顶部">↑</button>
+
+<input type="file" id="node-folder-input" class="hidden" webkitdirectory multiple onchange="handleNodeFolderUpload(this)">
+<input type="file" id="node-single-file-input" class="hidden" accept=".md" onchange="handleNodeSingleFileSelect(this)">
+
+<!-- ================= 笔记上传选择弹窗 ================= -->
+<div id="nodePublishModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 modal-overlay transition-all duration-200" style="display: none;">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8 border border-gray-200" onclick="event.stopPropagation()">
+        <h3 class="text-lg font-medium text-gray-800 mb-6 text-center">上传笔记</h3>
+        <div class="grid grid-cols-2 gap-4">
+            <div onclick="closeNodePublishModal(); document.getElementById('node-folder-input').click()" class="p-6 rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-md cursor-pointer transition-all text-center group">
+                <svg class="w-10 h-10 mx-auto mb-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2 6a2 2 0 012-2h5l2 2h9a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path></svg>
+                <p class="font-medium text-gray-700">上传文件夹</p>
+                <p class="text-xs text-gray-400 mt-1">保留目录结构，同名自动更新</p>
+            </div>
+            <div onclick="closeNodePublishModal(); openNodeSingleUpload()" class="p-6 rounded-xl border border-gray-200 hover:border-purple-300 hover:shadow-md cursor-pointer transition-all text-center group">
+                <svg class="w-10 h-10 mx-auto mb-3 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"></path></svg>
+                <p class="font-medium text-gray-700">上传文件</p>
+                <p class="text-xs text-gray-400 mt-1">手动选择归属路径</p>
+            </div>
+        </div>
+        <button onclick="closeNodePublishModal()" class="mt-6 w-full py-3 text-gray-500 border border-gray-200 rounded-xl hover:bg-gray-50 transition">取消</button>
+    </div>
+</div>
+
+<!-- ================= 单文件笔记上传弹窗 ================= -->
+<div id="nodeSingleModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 modal-overlay" style="display: none;">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-gray-200" onclick="event.stopPropagation()">
+        <h3 class="text-lg font-medium text-gray-800 mb-5">上传笔记文件</h3>
+        <div class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold uppercase mb-2 ml-1 text-gray-400">文件</label>
+                <div onclick="document.getElementById('node-single-file-input').click()"
+                     class="border-2 border-dashed rounded-xl p-6 text-center cursor-pointer hover:border-blue-400 transition border-gray-200">
+                    <span id="node-single-file-name" class="text-gray-400">点击选择 .md 文件</span>
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-bold uppercase mb-2 ml-1 text-gray-400">归属路径</label>
+                <input type="text" id="node-single-path" placeholder="例如: java/spring（留空则为根目录）"
+                       class="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none transition focus:ring-2 focus:ring-blue-300 bg-white"
+                       list="node-path-suggestions">
+                <datalist id="node-path-suggestions"></datalist>
+            </div>
+        </div>
+        <div class="flex justify-end gap-3 mt-6">
+            <button onclick="closeNodeSingleUpload()" class="px-5 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 transition text-gray-500">取消</button>
+            <button id="node-single-upload-btn" onclick="uploadNodeSingleFile()" class="px-5 py-2 rounded-xl bg-gray-900 text-white hover:bg-black transition active:scale-95 font-medium">上传</button>
+        </div>
+    </div>
+</div>
 
 <!-- ================= 发布选择弹窗 ================= -->
 <div id="publishModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 modal-overlay transition-all duration-200" style="display: none;">
@@ -710,6 +768,117 @@
         input.value = '';
     }
 
+    // ================= 笔记上传 =================
+    let currentNodeFile = null;
+
+    function showNodePublishModal() {
+        const modal = document.getElementById('nodePublishModal');
+        modal.style.display = 'flex';
+        modal.classList.add('items-center', 'justify-center');
+    }
+
+    function closeNodePublishModal() {
+        document.getElementById('nodePublishModal').style.display = 'none';
+    }
+
+    function openNodeSingleUpload() {
+        const modal = document.getElementById('nodeSingleModal');
+        modal.style.display = 'flex';
+        modal.classList.add('items-center', 'justify-center');
+        currentNodeFile = null;
+        document.getElementById('node-single-file-name').textContent = '点击选择 .md 文件';
+        document.getElementById('node-single-path').value = '';
+        updateNodePathSuggestions();
+    }
+
+    function closeNodeSingleUpload() {
+        document.getElementById('nodeSingleModal').style.display = 'none';
+        document.getElementById('node-single-file-input').value = '';
+        currentNodeFile = null;
+    }
+
+    function handleNodeSingleFileSelect(input) {
+        if (input.files.length > 0) {
+            currentNodeFile = input.files[0];
+            document.getElementById('node-single-file-name').textContent = currentNodeFile.name;
+        }
+    }
+
+    async function uploadNodeSingleFile() {
+        if (!currentNodeFile) { alert('请先选择文件'); return; }
+        const path = document.getElementById('node-single-path').value.trim();
+        const formData = new FormData();
+        formData.append('file', currentNodeFile);
+        if (path) formData.append('path', path);
+
+        const btn = document.getElementById('node-single-upload-btn');
+        btn.disabled = true; btn.textContent = '上传中...';
+
+        try {
+            const res = await authFetch(`${API_BASE}/admin/nodeUpload`, { method: 'POST', body: formData });
+            const r = await res.json();
+            if (r.code === 1) {
+                alert('笔记上传成功');
+                closeNodeSingleUpload();
+                document.getElementById('node-single-file-input').value = '';
+            } else {
+                alert(r.msg || '上传失败');
+            }
+        } catch (e) {
+            alert('网络错误');
+        } finally {
+            btn.disabled = false; btn.textContent = '上传';
+        }
+    }
+
+    async function handleNodeFolderUpload(input) {
+        const files = Array.from(input.files);
+        if (files.length === 0) { input.value = ''; return; }
+
+        const mdFiles = files.filter(f => f.name.endsWith('.md'));
+        if (mdFiles.length === 0) {
+            alert('所选文件夹中没有 .md 文件');
+            input.value = '';
+            return;
+        }
+
+        const formData = new FormData();
+        const paths = [];
+        for (const f of mdFiles) {
+            formData.append('files', f);
+            paths.push(f.webkitRelativePath || f.name);
+        }
+        formData.append('paths', JSON.stringify(paths));
+
+        try {
+            const res = await authFetch(`${API_BASE}/admin/nodeBatchUpload`, { method: 'POST', body: formData });
+            const r = await res.json();
+            if (r.code === 1) alert(r.data);
+            else alert(r.msg || '上传失败');
+        } catch (e) {
+            alert('网络错误');
+        }
+
+        input.value = '';
+    }
+
+    async function updateNodePathSuggestions() {
+        try {
+            const res = await fetch(`${API_BASE}/node/select`);
+            const r = await res.json();
+            const datalist = document.getElementById('node-path-suggestions');
+            const paths = new Set();
+            if (r.code === 1 && r.data) {
+                for (const item of r.data) {
+                    for (let i = 1; i <= item.path.length; i++) {
+                        paths.add(item.path.slice(0, i).join('/'));
+                    }
+                }
+            }
+            datalist.innerHTML = Array.from(paths).sort().map(p => '<option value="' + p + '">').join('');
+        } catch (e) {}
+    }
+
     // ================= 发布选择弹窗 =================
     function showPublishModal() {
         const modal = document.getElementById('publishModal');
@@ -1045,12 +1214,26 @@
             if (e.target === writeModal) closeWriteModal();
         });
 
+        // 笔记上传选择弹窗
+        const nodePublishModal = document.getElementById('nodePublishModal');
+        nodePublishModal.addEventListener('click', (e) => {
+            if (e.target === nodePublishModal) closeNodePublishModal();
+        });
+
+        // 单文件笔记上传弹窗
+        const nodeSingleModal = document.getElementById('nodeSingleModal');
+        nodeSingleModal.addEventListener('click', (e) => {
+            if (e.target === nodeSingleModal) closeNodeSingleUpload();
+        });
+
         // 键盘ESC关闭所有弹窗
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 if (editModal.style.display === 'flex') closeEditModal();
                 if (publishModal.style.display === 'flex') closePublishModal();
                 if (writeModal.style.display === 'flex') closeWriteModal();
+                if (nodePublishModal.style.display === 'flex') closeNodePublishModal();
+                if (nodeSingleModal.style.display === 'flex') closeNodeSingleUpload();
             }
         });
 

@@ -361,6 +361,7 @@
 
     <!-- 右上角个人信息 + 主题切换 -->
     <div class="absolute top-6 right-8 flex items-center space-x-3 bg-white/50 backdrop-blur-md p-2 rounded-full px-4 border border-white/30 shadow-sm">
+        <a href="/node.html" class="text-sm font-medium text-gray-600 hover:text-gray-900 transition" title="查看笔记">笔记</a>
         <button class="theme-toggle" id="theme-toggle" title="切换暗色模式" onclick="toggleTheme()">🌙</button>
         <span class="font-medium text-gray-800">韩行风</span>
         <img src="images/头像.jpg" alt="头像" class="w-8 h-8 rounded-full border-2 border-white object-cover">
@@ -503,7 +504,7 @@
     let searchMode = false;
     let searchKeyword = '';
     let detailModalData = {}; // 缓存弹窗数据
-    const API_BASE = "http://localhost:8080";
+    const API_BASE = "";
 
     // =========================
     // 辅助方法：渲染 Markdown 内容，并高亮代码块

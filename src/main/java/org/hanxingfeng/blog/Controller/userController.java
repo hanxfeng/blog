@@ -5,10 +5,12 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.hanxingfeng.blog.Entity.Node;
 import org.hanxingfeng.blog.Entity.R;
 import org.hanxingfeng.blog.Entity.SummaryWriting;
 import org.hanxingfeng.blog.Entity.User;
 import org.hanxingfeng.blog.Entity.Writings;
+import org.hanxingfeng.blog.Mapper.NodeMapper;
 import org.hanxingfeng.blog.Mapper.SummaryWritingMapper;
 import org.hanxingfeng.blog.Mapper.UserMapper;
 import org.hanxingfeng.blog.Mapper.WritingsMapper;
@@ -64,6 +66,9 @@ public class userController {
 
     @Autowired
     private getGitHubCommit getGitHubCommit;
+
+    @Autowired
+    private NodeMapper nodeMapper;
 
     // TODO：添加在线写作功能
 
@@ -312,6 +317,105 @@ public class userController {
             return R.error("出现错误，请联系管理员处理");
         }
 
+    }
+
+    /**
+     * 笔记单文件上传（手动指定路径）
+     */
+    @PostMapping("/nodeUpload")
+    public R<String> nodeUpload(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "path", required = false) String path) {
+
+        if (file.isEmpty()) {
+            return R.error("文件不能为空");
+        }
+
+        String originalName = file.getOriginalFilename();
+        String suffix = StringUtils.getFilenameExtension(originalName);
+        if (suffix == null || !suffix.equalsIgnoreCase("md")) {
+            return R.error("只能上传 md 文件");
+        }
+
+        String title = buildNodeTitle(originalName, path);
+
+        try {
+            String body = new String(file.getBytes(), StandardCharsets.UTF_8);
+            saveOrUpdateNode(title, body);
+            log.info("笔记上传成功: {}", title);
+            return R.success("上传成功");
+        } catch (Exception e) {
+            log.error("上传笔记失败: {}", e.getMessage());
+            return R.error("上传失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 笔记文件夹批量上传（从 webkitRelativePath 提取路径）
+     */
+    @PostMapping("/nodeBatchUpload")
+    public R<String> nodeBatchUpload(
+            @RequestParam("files") MultipartFile[] files,
+            @RequestParam("paths") String pathsJson) {
+
+        if (files == null || files.length == 0) {
+            return R.error("文件不能为空");
+        }
+
+        try {
+            String[] paths = objectMapper.readValue(pathsJson, String[].class);
+            int inserted = 0, updated = 0;
+
+            for (int i = 0; i < files.length; i++) {
+                MultipartFile file = files[i];
+                String relativePath = paths[i].replace('\\', '/');
+
+                String suffix = StringUtils.getFilenameExtension(relativePath);
+                if (suffix == null || !suffix.equalsIgnoreCase("md")) {
+                    continue;
+                }
+
+                String title = relativePath;
+                String body = new String(file.getBytes(), StandardCharsets.UTF_8);
+
+                boolean isUpdate = saveOrUpdateNode(title, body);
+                if (isUpdate) updated++;
+                else inserted++;
+            }
+
+            log.info("批量上传完成: 新增 {} 篇, 更新 {} 篇", inserted, updated);
+            return R.success("上传完成: 新增 " + inserted + " 篇, 更新 " + updated + " 篇");
+        } catch (Exception e) {
+            log.error("批量上传失败: {}", e.getMessage());
+            return R.error("批量上传失败: " + e.getMessage());
+        }
+    }
+
+    private String buildNodeTitle(String originalName, String path) {
+        if (path == null || path.trim().isEmpty()) {
+            return originalName;
+        }
+        path = path.trim().replace('\\', '/');
+        if (path.startsWith("/")) path = path.substring(1);
+        if (path.endsWith("/")) path = path.substring(0, path.length() - 1);
+        return path.isEmpty() ? originalName : path + "/" + originalName;
+    }
+
+    private boolean saveOrUpdateNode(String title, String body) {
+        LambdaQueryWrapper<Node> qw = new LambdaQueryWrapper<>();
+        qw.eq(Node::getTitle, title);
+        Node existing = nodeMapper.selectOne(qw);
+
+        if (existing != null) {
+            existing.setBody(body);
+            nodeMapper.updateById(existing);
+            return true;
+        }
+        Node node = new Node();
+        node.setTitle(title);
+        node.setBody(body);
+        nodeMapper.insert(node);
+        return false;
     }
 
 }

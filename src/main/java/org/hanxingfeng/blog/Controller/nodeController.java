@@ -1,13 +1,12 @@
 package org.hanxingfeng.blog.Controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import lombok.extern.slf4j.Slf4j;
 import org.hanxingfeng.blog.Entity.Node;
 import org.hanxingfeng.blog.Entity.R;
 import org.hanxingfeng.blog.Mapper.NodeMapper;
 import org.hanxingfeng.blog.dto.NodeDto;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.security.core.parameters.P;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
@@ -15,12 +14,10 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+@Slf4j
 @RestController
 @RequestMapping("/node")
 public class nodeController {
-
-    @Autowired
-    private StringRedisTemplate redisTemplate;
 
     @Autowired
     private NodeMapper nodeMapper;
@@ -48,7 +45,7 @@ public class nodeController {
             // 路径（除文件名外的前缀部分）
             List<String> path = parts.length > 1
                     ? Arrays.asList(Arrays.copyOfRange(parts, 0, parts.length - 1))
-                    : Collections.emptyList();  // 无路径时用空列表，而不是 null
+                    : Collections.emptyList();
 
             NodeDto nodeDto = new NodeDto();
             nodeDto.setId(node.getId());
@@ -59,7 +56,6 @@ public class nodeController {
         return R.success(nodeDtos);
     }
 
-
     /**
      * 查看具体文章
      * @param id 文章的 id
@@ -67,14 +63,9 @@ public class nodeController {
      */
     @GetMapping("/selectNode/{id}")
     public R<Node> selectNode(@PathVariable int id) {
+        log.info("获取id为：{} 的文章",id);
         Node node = nodeMapper.selectById(id);
         return R.success(node);
-    }
-
-
-    @PostMapping("/updateNode")
-    public R<String> updateNode() {
-
     }
 
 }

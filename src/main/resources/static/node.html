@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>笔记管理</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css/github-markdown.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js/styles/github.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it/dist/markdown-it.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js/lib/common.min.js"></script>
+
+    <style>
+        :root {
+            --bg: #f9fafb;
+            --sidebar-bg: #ffffff;
+            --border: #e5e7eb;
+            --text: #1f2937;
+            --text-secondary: #6b7280;
+            --hover: #f3f4f6;
+            --active: #eff6ff;
+            --active-text: #2563eb;
+        }
+
+        [data-theme="dark"] {
+            --bg: #0d1117;
+            --sidebar-bg: #161b22;
+            --border: #30363d;
+            --text: #c9d1d9;
+            --text-secondary: #8b949e;
+            --hover: #1c2129;
+            --active: #1a2332;
+            --active-text: #58a6ff;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .sidebar {
+            background: var(--sidebar-bg);
+            border-right: 1px solid var(--border);
+        }
+
+        /* Tree styles */
+        .tree-item {
+            user-select: none;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .tree-item:hover { background: var(--hover); }
+        .tree-item.active { background: var(--active); color: var(--active-text); }
+        .tree-toggle {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            font-size: 10px;
+            transition: transform 0.2s;
+            flex-shrink: 0;
+        }
+        .tree-toggle.collapsed { transform: rotate(-90deg); }
+        .tree-toggle.empty { visibility: hidden; }
+        .tree-children { overflow: hidden; transition: max-height 0.3s ease; }
+        .tree-children.collapsed { max-height: 0 !important; }
+
+        /* Markdown content */
+        .markdown-body {
+            background: transparent;
+            font-size: 0.92rem;
+        }
+
+        /* Upload modal */
+        .modal-overlay {
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
+        }
+
+        /* Theme toggle */
+        .theme-toggle {
+            width: 36px; height: 36px; border-radius: 50%;
+            border: 1px solid var(--border); background: var(--sidebar-bg);
+            cursor: pointer; font-size: 18px; transition: all 0.3s; color: var(--text);
+        }
+        .theme-toggle:hover { transform: scale(1.1); }
+
+        /* Toast */
+        .toast {
+            position: fixed; top: 20px; right: 20px; z-index: 9999;
+            padding: 10px 20px; border-radius: 10px; color: #fff; font-size: 14px;
+            transform: translateX(120%); transition: transform 0.3s;
+        }
+        .toast.show { transform: translateX(0); }
+        .toast.success { background: #10b981; }
+        .toast.error { background: #ef4444; }
+
+        /* Sidebar resize */
+        .sidebar { width: 300px; min-width: 200px; }
+        .resize-handle { width: 4px; cursor: col-resize; background: transparent; transition: background 0.2s; }
+        .resize-handle:hover, .resize-handle.dragging { background: var(--active-text); }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+        [data-theme="dark"] ::-webkit-scrollbar-thumb { background: #30363d; }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+
+<!-- Header -->
+<header class="flex items-center justify-between px-6 py-3 border-b" style="background: var(--sidebar-bg); border-color: var(--border);">
+    <div class="flex items-center gap-4">
+        <h1 class="text-lg font-medium">笔记管理</h1>
+        <span class="text-xs px-2 py-0.5 rounded-full border" style="color: var(--text-secondary); border-color: var(--border);" id="note-count">0 篇笔记</span>
+    </div>
+    <div class="flex items-center gap-3">
+        <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="切换主题">🌙</button>
+    </div>
+</header>
+
+<!-- Main -->
+<div class="flex flex-1 overflow-hidden">
+    <!-- Sidebar -->
+    <aside class="sidebar flex flex-col overflow-hidden" id="sidebar">
+        <div class="p-3 border-b text-xs font-medium tracking-wider uppercase" style="color: var(--text-secondary); border-color: var(--border);">
+            目录
+        </div>
+        <div class="flex-1 overflow-y-auto p-2" id="tree-container">
+            <div class="text-sm text-center py-8" style="color: var(--text-secondary);">加载中...</div>
+        </div>
+    </aside>
+
+    <!-- Resize handle -->
+    <div class="resize-handle" id="resize-handle"></div>
+
+    <!-- Content -->
+    <main class="flex-1 overflow-y-auto p-6" id="content-area">
+        <div class="flex items-center justify-center h-full" style="color: var(--text-secondary);">
+            <div class="text-center">
+                <p class="text-lg mb-2">选择左侧笔记查看内容</p>
+                <p class="text-xs">或点击上方按钮上传新笔记</p>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+    const API_BASE = "";
+    let treeData = null;       // flat list from server
+    let treeRoot = null;      // nested tree structure
+    let activeNodeId = null;
+
+    // ==================== Theme ====================
+    function initTheme() {
+        if (localStorage.getItem('theme') === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            document.getElementById('theme-toggle').innerText = '☀️';
+        }
+    }
+    function toggleTheme() {
+        const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        localStorage.setItem('theme', next);
+        document.getElementById('theme-toggle').innerText = next === 'dark' ? '☀️' : '🌙';
+    }
+
+    // ==================== Toast ====================
+    function showToast(msg, type) {
+        const toast = document.getElementById('toast');
+        toast.textContent = msg;
+        toast.className = 'toast ' + type + ' show';
+        setTimeout(() => { toast.classList.remove('show'); }, 2500);
+    }
+
+    // ==================== Markdown ====================
+    var hljs = window.hljs;
+
+    const md = window.markdownit({
+        html: false, linkify: true, typographer: true,
+        highlight: function (str, lang) {
+            if (lang && hljs && hljs.getLanguage(lang)) {
+                try { return hljs.highlight(str, { language: lang }).value; } catch (__) {}
+            }
+            return '';
+        }
+    });
+
+    function renderMarkdown(text) {
+        if (!text) return '<p style="color: var(--text-secondary); text-align: center;">暂无内容</p>';
+        let html = md.render(text);
+        let wrapper = document.createElement('div');
+        wrapper.innerHTML = html;
+        if (hljs) {
+            wrapper.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+        }
+        return wrapper.innerHTML;
+    }
+
+    // ==================== Tree Building ====================
+    function buildTree(flatList) {
+        let root = { children: {}, files: [] };
+        for (let item of flatList) {
+            let node = root;
+            for (let seg of item.path) {
+                if (!node.children[seg]) {
+                    node.children[seg] = { children: {}, files: [] };
+                }
+                node = node.children[seg];
+            }
+            node.files.push(item);
+        }
+        return root;
+    }
+
+    function renderTree() {
+        let container = document.getElementById('tree-container');
+        if (!treeRoot) {
+            container.innerHTML = '<div class="text-sm text-center py-8" style="color: var(--text-secondary);">暂无笔记</div>';
+            return;
+        }
+        container.innerHTML = '';
+        renderNode('', treeRoot, container, 0);
+
+        // update count
+        let count = treeData ? treeData.length : 0;
+        document.getElementById('note-count').textContent = count + ' 篇笔记';
+    }
+
+    function renderNode(name, node, parent, depth) {
+        let keys = Object.keys(node.children).sort();
+        let allFiles = [...node.files];
+
+        // render folders
+        for (let key of keys) {
+            let child = node.children[key];
+            let wrapper = document.createElement('div');
+
+            let row = document.createElement('div');
+            row.className = 'tree-item flex items-center gap-1 py-1 px-2 rounded';
+            row.style.paddingLeft = (depth * 16 + 4) + 'px';
+
+            let toggle = document.createElement('span');
+            toggle.className = 'tree-toggle';
+            toggle.textContent = '▼';
+            toggle.onclick = function(e) { e.stopPropagation(); toggleCollapse(wrapper, toggle); };
+
+            let icon = document.createElement('span');
+            icon.textContent = '📁';
+            icon.style.fontSize = '14px';
+
+            let label = document.createElement('span');
+            label.className = 'text-sm ml-1 truncate';
+            label.textContent = key;
+
+            row.appendChild(toggle);
+            row.appendChild(icon);
+            row.appendChild(label);
+            wrapper.appendChild(row);
+
+            let childrenDiv = document.createElement('div');
+            childrenDiv.className = 'tree-children';
+            childrenDiv.style.maxHeight = '9999px'; // default expanded
+            renderNode(key, child, childrenDiv, depth + 1);
+            wrapper.appendChild(childrenDiv);
+            parent.appendChild(wrapper);
+        }
+
+        // render files
+        for (let f of allFiles) {
+            let row = document.createElement('div');
+            row.className = 'tree-item flex items-center gap-1 py-1 px-2 rounded';
+            row.style.paddingLeft = (depth * 16 + 22) + 'px';
+            if (activeNodeId === f.id) {
+                row.classList.add('active');
+            }
+
+            let dot = document.createElement('span');
+            dot.className = 'tree-toggle empty';
+            dot.textContent = '▼';
+
+            let icon = document.createElement('span');
+            icon.textContent = '📄';
+            icon.style.fontSize = '13px';
+
+            let label = document.createElement('span');
+            label.className = 'text-sm ml-1 truncate';
+            label.textContent = f.title;
+
+            row.appendChild(dot);
+            row.appendChild(icon);
+            row.appendChild(label);
+            row.onclick = function() { selectNode(f.id, row); };
+            parent.appendChild(row);
+        }
+    }
+
+    function toggleCollapse(wrapper, toggle) {
+        let childrenDiv = wrapper.querySelector('.tree-children');
+        if (!childrenDiv) return;
+        let isCollapsed = childrenDiv.classList.contains('collapsed');
+        if (isCollapsed) {
+            childrenDiv.classList.remove('collapsed');
+            childrenDiv.style.maxHeight = '9999px';
+            toggle.classList.remove('collapsed');
+        } else {
+            childrenDiv.classList.add('collapsed');
+            childrenDiv.style.maxHeight = '0px';
+            toggle.classList.add('collapsed');
+        }
+    }
+
+    function expandAll() {
+        document.querySelectorAll('.tree-children').forEach(c => {
+            c.classList.remove('collapsed');
+            c.style.maxHeight = '9999px';
+        });
+        document.querySelectorAll('.tree-toggle:not(.empty)').forEach(t => t.classList.remove('collapsed'));
+    }
+
+    function collapseAll() {
+        document.querySelectorAll('.tree-children').forEach(c => {
+            c.classList.add('collapsed');
+            c.style.maxHeight = '0px';
+        });
+        document.querySelectorAll('.tree-toggle:not(.empty)').forEach(t => t.classList.add('collapsed'));
+    }
+
+    // ==================== Node Selection ====================
+    async function selectNode(id, rowEl) {
+        activeNodeId = id;
+        // update active state
+        document.querySelectorAll('.tree-item.active').forEach(el => el.classList.remove('active'));
+        if (rowEl) rowEl.classList.add('active');
+
+        let content = document.getElementById('content-area');
+        content.innerHTML = '<div class="flex items-center justify-center h-full"><span style="color: var(--text-secondary);">加载中...</span></div>';
+
+        try {
+            let res = await fetch(API_BASE + '/node/selectNode/' + id);
+            console.log('HTTP status:', res.status, 'content-length:', res.headers.get('content-length'));
+            let text = await res.text();
+            console.log('Response first 200 chars:', text.substring(0, 200));
+            let r = JSON.parse(text);
+            if (r.code === 1 && r.data) {
+                let node = r.data;
+                let bodyHtml = renderMarkdown(node.body || '');
+                content.innerHTML = `
+                    <div class="max-w-3xl mx-auto">
+                        <h2 class="text-xl font-bold mb-6">${escapeHtml(node.title.split('/').pop().replace(/\.md$/, ''))}</h2>
+                        <div class="markdown-body">${bodyHtml}</div>
+                    </div>
+                `;
+            } else {
+                content.innerHTML = '<p style="color: var(--text-secondary); text-align: center;">加载失败: ' + escapeHtml(r.msg || '') + '</p>';
+            }
+        } catch (e) {
+            console.error('selectNode error:', e);
+            content.innerHTML = '<p style="color: var(--text-secondary); text-align: center;">网络错误: ' + escapeHtml(e.message) + '</p>';
+        }
+    }
+
+    // ==================== Load Data ====================
+    async function loadTree() {
+        try {
+            let res = await fetch(API_BASE + '/node/select');
+            let r = await res.json();
+            if (r.code === 1 && r.data) {
+                treeData = r.data;
+                treeRoot = buildTree(treeData);
+            } else {
+                treeData = [];
+                treeRoot = null;
+            }
+            renderTree();
+        } catch (e) {
+            treeData = [];
+            treeRoot = null;
+            renderTree();
+        }
+    }
+
+    // ==================== Sidebar Resize ====================
+    function initResize() {
+        let sidebar = document.getElementById('sidebar');
+        let handle = document.getElementById('resize-handle');
+        let startX, startWidth;
+
+        handle.addEventListener('mousedown', function(e) {
+            startX = e.clientX;
+            startWidth = sidebar.offsetWidth;
+            handle.classList.add('dragging');
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+
+            function onMove(e) {
+                let diff = e.clientX - startX;
+                let newWidth = Math.max(200, Math.min(600, startWidth + diff));
+                sidebar.style.width = newWidth + 'px';
+                sidebar.style.minWidth = newWidth + 'px';
+            }
+            function onUp() {
+                handle.classList.remove('dragging');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            }
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        });
+    }
+
+    // ==================== Modal click-outside ====================
+    function initModals() {
+        // No modals on this page currently
+    }
+
+    // ==================== Init ====================
+    window.onload = function() {
+        initTheme();
+        initResize();
+        initModals();
+        loadTree();
+    };
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+</script>
+</body>
+</html>
