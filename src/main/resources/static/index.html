@@ -356,7 +356,7 @@
 <!-- 顶部 -->
 <header class="relative">
     <div class="hero-section">
-        <img src="images/背景.png" alt="背景" class="hero-image">
+        <img id="hero-image" src="images/背景-亮色.png" alt="背景" class="hero-image">
     </div>
 
     <!-- 右上角个人信息 + 主题切换 -->
@@ -538,6 +538,13 @@
     // =========================
     // 主题切换
     // =========================
+    function updateHeroImage(theme) {
+        const img = document.getElementById('hero-image');
+        if (img) {
+            img.src = theme === 'dark' ? 'images/背景-暗色.png' : 'images/背景-亮色.png';
+        }
+    }
+
     function initTheme() {
         const saved = localStorage.getItem('theme');
         if (saved === 'dark') {
@@ -547,6 +554,7 @@
             document.documentElement.setAttribute('data-theme', 'light');
             document.getElementById('theme-toggle').innerText = '🌙';
         }
+        updateHeroImage(document.documentElement.getAttribute('data-theme'));
     }
 
     function toggleTheme() {
@@ -555,6 +563,7 @@
         document.documentElement.setAttribute('data-theme', next);
         localStorage.setItem('theme', next);
         document.getElementById('theme-toggle').innerText = next === 'dark' ? '☀️' : '🌙';
+        updateHeroImage(next);
     }
 
     // =========================
