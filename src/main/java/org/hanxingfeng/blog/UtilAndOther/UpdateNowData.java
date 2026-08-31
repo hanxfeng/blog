@@ -38,7 +38,7 @@ public class UpdateNowData {
             .registerModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-    public NodeCount updateNoteData() throws Exception {
+    public NodeCount  updateNoteData() throws Exception {
         // 总笔记数
         int totalNoteWordCount = 0;
 

@@ -274,7 +274,7 @@ public class blogController {
                         redisData, new TypeReference<>() {
                         }
                 );
-                log.info("Redis 中获取历史笔记数据");
+                log.info("Redis 中获取历史代码数据");
                 return R.success(re);
             } catch (Exception e) {
                 log.info("缓存数据损坏");

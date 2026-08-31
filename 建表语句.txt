@@ -1,0 +1,88 @@
+-- ============================================================
+-- blog 数据库建表语句（数据恢复用）
+-- 说明：脚本会先删除同名表再重建，请确认数据已备份或已确认可丢弃。
+-- ============================================================
+
+CREATE DATABASE IF NOT EXISTS blog DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE blog;
+
+-- ---------- 1. 用户表 user ----------
+DROP TABLE IF EXISTS `user`;
+CREATE TABLE `user` (
+  `user_id`    BIGINT       NOT NULL AUTO_INCREMENT COMMENT '用户ID',
+  `user_name`  VARCHAR(50)  DEFAULT NULL COMMENT '用户名',
+  `password`   VARCHAR(255) DEFAULT NULL COMMENT '密码(BCrypt加密)',
+  `role`       INT          DEFAULT NULL COMMENT '角色',
+  `ip`         VARCHAR(64)  DEFAULT NULL COMMENT 'IP地址',
+  PRIMARY KEY (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
+
+-- ---------- 2. 文章表 writings ----------
+DROP TABLE IF EXISTS `writings`;
+CREATE TABLE `writings` (
+  `id`         BIGINT       NOT NULL AUTO_INCREMENT COMMENT 'ID',
+  `title`      VARCHAR(255) DEFAULT NULL COMMENT '文章标题',
+  `content`    LONGTEXT     COMMENT '文章内容',
+  `preview`    VARCHAR(255) DEFAULT NULL COMMENT '文章摘要',
+  `date`       DATE         DEFAULT NULL COMMENT '日期',
+  `view_count` INT          DEFAULT 0 COMMENT '点击量',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文章表';
+
+-- ---------- 3. 文章摘要表 summary_writing ----------
+DROP TABLE IF EXISTS `summary_writing`;
+CREATE TABLE `summary_writing` (
+  `id`      BIGINT       NOT NULL AUTO_INCREMENT COMMENT 'ID',
+  `title`   VARCHAR(255) DEFAULT NULL COMMENT '文章标题',
+  `preview` VARCHAR(255) DEFAULT NULL COMMENT '文章摘要',
+  `date`    DATE         DEFAULT NULL COMMENT '日期',
+  `is_top`  INT          DEFAULT 0 COMMENT '是否置顶',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文章摘要表';
+
+-- ---------- 4. 笔记统计表 node_count ----------
+-- 需求变更：不再统计「每日更新字数」，仅统计总字数，恢复代码中 daily_note_word_count 置 0
+DROP TABLE IF EXISTS `node_count`;
+CREATE TABLE `node_count` (
+  `daily_note_word_count` INT  DEFAULT 0 COMMENT '每日字数统计（已弃用，保留兼容）',
+  `daily_note_count`      INT  DEFAULT 0 COMMENT '每日笔记数量统计',
+  `total_note_count`      INT  DEFAULT 0 COMMENT '到当前日期总笔记数量',
+  `total_note_word_count` INT  DEFAULT 0 COMMENT '到当前日期总笔记字数',
+  `today_time`            DATE NOT NULL COMMENT '统计日期',
+  PRIMARY KEY (`today_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='笔记统计表';
+
+-- ---------- 5. 笔记表 node ----------
+DROP TABLE IF EXISTS `node`;
+CREATE TABLE `node` (
+  `id`    INT          NOT NULL AUTO_INCREMENT COMMENT 'ID',
+  `title` VARCHAR(255) DEFAULT NULL COMMENT '标题(相对路径)',
+  `body`  LONGTEXT     COMMENT '正文',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='笔记表';
+
+-- ---------- 6. 提交统计表 commit_count ----------
+DROP TABLE IF EXISTS `commit_count`;
+CREATE TABLE `commit_count` (
+  `id`            INT  NOT NULL AUTO_INCREMENT COMMENT 'ID',
+  `additions`     INT  DEFAULT 0 COMMENT '新增行数',
+  `deletions`     INT  DEFAULT 0 COMMENT '删除行数',
+  `total_changes` INT  DEFAULT 0 COMMENT '总变更行数',
+  `commit_time`   DATE DEFAULT NULL COMMENT '提交日期',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='提交统计表';
+
+-- ---------- 7. 提交明细表 git_commit ----------
+DROP TABLE IF EXISTS `git_commit`;
+CREATE TABLE `git_commit` (
+  `id`             BIGINT        NOT NULL AUTO_INCREMENT COMMENT 'ID',
+  `repo_name`      VARCHAR(50)   DEFAULT NULL COMMENT '仓库名',
+  `commit_sha`     VARCHAR(1000) DEFAULT NULL COMMENT '提交SHA',
+  `commit_message` VARCHAR(200)  DEFAULT NULL COMMENT '提交信息',
+  `addtions`       INT           DEFAULT NULL COMMENT '新增行数',
+  `deletions`      INT           DEFAULT NULL COMMENT '删除行数',
+  `total_changes`  INT           DEFAULT NULL COMMENT '总变更行数',
+  `commit_time`    DATE          DEFAULT NULL COMMENT '提交日期',
+  `created_at`     DATETIME      DEFAULT NULL COMMENT '记录创建时间',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='提交明细表';
