@@ -177,7 +177,18 @@ public class UpdateNowData {
         NodeCount yesterdayNodeCount = blogMapper.selectOne(qw);
         // 判断数据是否存在
         if (yesterdayNodeCount == null) {
-            throw new Exception("未找到昨天的统计数据，请检查数据采集任务");
+            LambdaQueryWrapper<NodeCount> qwe = new LambdaQueryWrapper<>();
+            qwe.orderByDesc(NodeCount::getTodayTime);
+            qwe.last("LIMIT 1");
+            NodeCount nc = blogMapper.selectOne(qwe);
+            nc.setDailyNoteWordCount(0);
+            nc.setDailyNoteCount(0);
+            nc.setTotalNoteCount(0);
+            nc.setTotalNoteWordCount(0);
+            nc.setTodayTime(yesterday);
+            blogMapper.insert(nc);
+            log.info("数据不存在，已添加临时数据，请稍后手动检查并修改数据");
+            yesterdayNodeCount = nc;
         }
         yesterdayTotalNoteCount = yesterdayNodeCount.getTotalNoteCount();
         yesterdayTotalNoteWordCount = yesterdayNodeCount.getTotalNoteWordCount();

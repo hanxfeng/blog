@@ -1,33 +1,25 @@
 package org.hanxingfeng.blog.Controller;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
-import org.hanxingfeng.blog.Entity.Node;
 import org.hanxingfeng.blog.Entity.R;
-import org.hanxingfeng.blog.Entity.SummaryWriting;
 import org.hanxingfeng.blog.Entity.User;
 import org.hanxingfeng.blog.Entity.Writings;
-import org.hanxingfeng.blog.Mapper.NodeMapper;
-import org.hanxingfeng.blog.Mapper.SummaryWritingMapper;
-import org.hanxingfeng.blog.Mapper.UserMapper;
-import org.hanxingfeng.blog.Mapper.WritingsMapper;
+import org.hanxingfeng.blog.Service.NodeService;
 import org.hanxingfeng.blog.Service.SummaryWritingService;
+import org.hanxingfeng.blog.Service.UserService;
 import org.hanxingfeng.blog.UtilAndOther.JWTUtil;
 import org.hanxingfeng.blog.UtilAndOther.UpdateNowData;
 import org.hanxingfeng.blog.UtilAndOther.getGitHubCommit;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -41,19 +33,16 @@ public class userController {
     private UpdateNowData updateNowData;
 
     @Autowired
-    private WritingsMapper writingsMapper;
-
-    @Autowired
     private StringRedisTemplate redisTemplate;
 
     @Autowired
     private SummaryWritingService summaryWritingService;
 
     @Autowired
-    private SummaryWritingMapper summaryWritingMapper;
+    private UserService userService;
 
     @Autowired
-    private UserMapper userMapper;
+    private NodeService nodeService;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -62,13 +51,7 @@ public class userController {
     private JWTUtil jwtUtil;
 
     @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
     private getGitHubCommit getGitHubCommit;
-
-    @Autowired
-    private NodeMapper nodeMapper;
 
     // TODO：添加在线写作功能
 
@@ -89,21 +72,21 @@ public class userController {
         else {
             count = Long.valueOf(result);
             if (count >= 5) {
-            return R.error("尝试次数过多请一小时后再试或联系管理员处理");
-        }}
+                return R.error("尝试次数过多请一小时后再试或联系管理员处理");
+            }}
 
 
         String userName = user.getUserName();
         String password = user.getPassword();
 
-        // 查询数据库中的账号密码
-        LambdaQueryWrapper<User> qw = new LambdaQueryWrapper<>();
-        qw.eq(User::getUserName, userName);
-        User sqlUser = userMapper.selectOne(qw);
-
-        if (sqlUser == null || !passwordEncoder.matches(password, sqlUser.getPassword())) {
+        // 查询数据库中的账号密码并进行校验
+        User sqlUser;
+        try {
+            sqlUser = userService.login(userName, password);
+        }
+        catch (IllegalArgumentException e) {
             redisTemplate.opsForValue().set(key, String.valueOf(count + 1));
-            return R.error("用户不存在或密码错误！");
+            return R.error(e.getMessage());
         }
 
         Long userId = sqlUser.getUserId();
@@ -139,8 +122,6 @@ public class userController {
 
         log.info("开始上传文件");
 
-        Map<String, Object> result = new HashMap<>();
-
         try {
 
             // 1. 文件为空校验
@@ -157,55 +138,20 @@ public class userController {
                 return R.error("只能上传 md 文件");
             }
 
-            // 判断是否有同样的文章
-            fileName = fileName.substring(0, fileName.length() - 3);
-            LambdaQueryWrapper<Writings> qw = new LambdaQueryWrapper<>();
-            qw.eq(Writings::getTitle, fileName);
-            Writings writingsTemp = writingsMapper.selectOne(qw);
-            if (writingsTemp != null) {
-                return R.error("已上传过同名文章");
-            }
-
             // 3. 读取 markdown 内容
             String content = new String(
                     file.getBytes(),
                     StandardCharsets.UTF_8
             );
 
-            int endIndex = Math.min(content.length(), 20);
-
-            String preview = content.substring(0, endIndex);
-
-            // 返回 Writings 类
-            log.info("上传文件名：{}",fileName);
-            Writings writings = new Writings();
-            writings.setTitle(fileName);
-            writings.setContent(content);
-            writings.setPreview(preview);
-            writings.setDate(LocalDate.now());
-
-            SummaryWriting summaryWriting = new SummaryWriting();
-            summaryWriting.setTitle(fileName);
-            summaryWriting.setPreview(preview);
-            summaryWriting.setDate(LocalDate.now());
-
-
-            // 将数据保存至数据库
-            try {
-                summaryWritingService.saveWriting(writings, summaryWriting);
-            } catch (Exception e) {
-                log.info("发生错误：\n {}", e.getMessage());
-                return R.error(e.getMessage());
-            }
-
-            // 将数据保存至 Redis
-            String key = "Writing" + writings.getId().toString();
-            String stringData = objectMapper.writeValueAsString(writings);
-            redisTemplate.opsForValue().set(key, stringData);
+            // 4. 将数据保存至数据库和 Redis
+            summaryWritingService.uploadWriting(fileName, content);
 
             return R.success("上传成功");
 
         } catch (Exception e) {
+
+            log.info("发生错误：\n {}", e.getMessage());
 
             return R.error(e.getMessage());
         }
@@ -218,12 +164,8 @@ public class userController {
     public R<String> delete(@PathVariable Long id) {
         log.info("开始删除文章，id为：{}",id);
 
-        // 在数据库中删除
+        // 在数据库和 Redis 中删除
         summaryWritingService.deleteWriting(id);
-
-        // 在 Redis 中删除
-        String key = "Writing" + id.toString();
-        redisTemplate.delete(key);
 
         return R.success("删除成功");
     }
@@ -245,46 +187,16 @@ public class userController {
      * @return
      * @throws JsonProcessingException
      */
-    @Transactional
     @PostMapping("/updateWritingById")
     public R<String> updateWritingById(@RequestBody Writings writings
     , @RequestParam(value="upOrIn", required = false) Integer upOrIn) throws JsonProcessingException {
-        log.info("开始对文章进行修改");
 
-        // 更新文章摘要
-        // 3. 读取 markdown 内容
-        String content = writings.getContent();
-
-        int endIndex = Math.min(content.length(), 60);
-
-        String preview = content.substring(0, endIndex);
-
-        // 更新摘要类
-        SummaryWriting summaryWriting = new SummaryWriting();
-        summaryWriting.setTitle(writings.getTitle());
-        summaryWriting.setPreview(preview);
-
-        // 更新文章类的摘要信息
-        writings.setPreview(preview);
-        if (upOrIn == null || upOrIn == 0) {
-            writingsMapper.insert(writings);
-            // insert 后 MyBatis-Plus 自动回填 writings.id，同步到 summaryWriting 保证两表 ID 一致
-            summaryWriting.setId(writings.getId());
-            summaryWriting.setDate(LocalDate.now());
-            summaryWritingMapper.insert(summaryWriting);
+        try {
+            summaryWritingService.updateWriting(writings, upOrIn == null ? 0 : upOrIn);
         }
-        else if (upOrIn == 1) {
-            writingsMapper.updateById(writings);
-            summaryWritingMapper.updateById(summaryWriting);
+        catch (IllegalArgumentException e) {
+            return R.error(e.getMessage());
         }
-        else {
-            return R.error("出现未知错误，请联系管理员");
-        }
-
-        // 更新在 Redis 中的数据
-        String key = "Writing" + writings.getId().toString();
-        String rStringData = objectMapper.writeValueAsString(writings);
-        redisTemplate.opsForValue().set(key, rStringData);
 
         return R.success("修改成功");
     }
@@ -298,20 +210,11 @@ public class userController {
     @GetMapping("/topWriting/{id}/{isTop}")
     public R<String> topWriting(@PathVariable int id, @PathVariable int isTop) {
         try {
-            log.info("开始对文章进行置顶或取消置顶，id 为：{}", id);
-            String key = "PageSummaryWriting";
-            SummaryWriting sw = summaryWritingMapper.selectById(id);
-            int oldIsTop = sw.getIsTop();
-            if (oldIsTop == isTop && isTop == 1) {
-                return R.error("该文章已被置顶");
-            }
-            if (oldIsTop == isTop && isTop == 0) {
-                return R.error("该文章未被置顶，不能取消置顶");
-            }
-            sw.setIsTop(isTop);
-            summaryWritingMapper.updateById(sw);
-            redisTemplate.delete(key);
+            summaryWritingService.topWriting(id, isTop);
             return R.success("操作成功");
+        }
+        catch (IllegalArgumentException e) {
+            return R.error(e.getMessage());
         }
         catch (Exception e) {
             return R.error("出现错误，请联系管理员处理");
@@ -337,12 +240,9 @@ public class userController {
             return R.error("只能上传 md 文件");
         }
 
-        String title = buildNodeTitle(originalName, path);
-
         try {
             String body = new String(file.getBytes(), StandardCharsets.UTF_8);
-            saveOrUpdateNode(title, body);
-            log.info("笔记上传成功: {}", title);
+            nodeService.uploadNode(originalName, path, body);
             return R.success("上传成功");
         } catch (Exception e) {
             log.error("上传笔记失败: {}", e.getMessage());
@@ -375,10 +275,9 @@ public class userController {
                     continue;
                 }
 
-                String title = relativePath;
                 String body = new String(file.getBytes(), StandardCharsets.UTF_8);
 
-                boolean isUpdate = saveOrUpdateNode(title, body);
+                boolean isUpdate = nodeService.saveOrUpdateNode(relativePath, body);
                 if (isUpdate) updated++;
                 else inserted++;
             }
@@ -389,33 +288,6 @@ public class userController {
             log.error("批量上传失败: {}", e.getMessage());
             return R.error("批量上传失败: " + e.getMessage());
         }
-    }
-
-    private String buildNodeTitle(String originalName, String path) {
-        if (path == null || path.trim().isEmpty()) {
-            return originalName;
-        }
-        path = path.trim().replace('\\', '/');
-        if (path.startsWith("/")) path = path.substring(1);
-        if (path.endsWith("/")) path = path.substring(0, path.length() - 1);
-        return path.isEmpty() ? originalName : path + "/" + originalName;
-    }
-
-    private boolean saveOrUpdateNode(String title, String body) {
-        LambdaQueryWrapper<Node> qw = new LambdaQueryWrapper<>();
-        qw.eq(Node::getTitle, title);
-        Node existing = nodeMapper.selectOne(qw);
-
-        if (existing != null) {
-            existing.setBody(body);
-            nodeMapper.updateById(existing);
-            return true;
-        }
-        Node node = new Node();
-        node.setTitle(title);
-        node.setBody(body);
-        nodeMapper.insert(node);
-        return false;
     }
 
 }
