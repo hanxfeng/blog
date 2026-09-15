@@ -74,7 +74,7 @@ public class CommitCountServiceImpl extends ServiceImpl<CommitCountMapper, Commi
             re = cc;
 
             String redisData = objectMapper.writeValueAsString(re);
-            redisTemplate.opsForValue().set(key, redisData, 30, TimeUnit.MINUTES);
+            redisTemplate.opsForValue().set(key, redisData, 36, TimeUnit.MINUTES);
 
         }
         else {
@@ -138,7 +138,7 @@ public class CommitCountServiceImpl extends ServiceImpl<CommitCountMapper, Commi
                     throw new RuntimeException(e);
                 }
             }
-            connection.expire(rawKey, 1800);
+            connection.expire(rawKey, 2400);
             return null;
         } );
 
@@ -166,6 +166,7 @@ public class CommitCountServiceImpl extends ServiceImpl<CommitCountMapper, Commi
         }
         else {
             re = new BigDecimal(redisData);
+            redisTemplate.opsForValue().set(key, String.valueOf(re));
         }
 
         return re;

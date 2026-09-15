@@ -123,7 +123,7 @@ public class SummaryWritingServiceImpl extends ServiceImpl<SummaryWritingMapper,
 
             // 添加缓存
             String redisData = objectMapper.writeValueAsString(resultPage);
-            redisTemplate.opsForValue().set(key, redisData, 30, TimeUnit.MINUTES);
+            redisTemplate.opsForValue().set(key, redisData, 38, TimeUnit.MINUTES);
             return resultPage;
         }
     }

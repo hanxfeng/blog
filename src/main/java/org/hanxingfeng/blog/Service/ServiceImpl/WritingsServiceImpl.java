@@ -73,7 +73,7 @@ public class WritingsServiceImpl extends ServiceImpl<WritingsMapper, Writings> i
                 Map<String, Object> errorMap = new HashMap<String, Object>();
                 errorMap.put("null", "null");
                 redisTemplate.opsForHash().putAll(key, errorMap);
-                redisTemplate.expire(key, 30, TimeUnit.MINUTES);
+                redisTemplate.expire(key, 34, TimeUnit.MINUTES);
                 return  null;
             }
             content = writings.getContent();
@@ -93,7 +93,7 @@ public class WritingsServiceImpl extends ServiceImpl<WritingsMapper, Writings> i
         map.put(fieldMeat, metaJson);
         map.put(fieldContent, compressedContent);
         redisTemplate.opsForHash().putAll(key, map);
-        redisTemplate.expire(key, 30, TimeUnit.MINUTES);
+        redisTemplate.expire(key, 40, TimeUnit.MINUTES);
 
         writings.setContent(content);
         return writings;

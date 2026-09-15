@@ -115,7 +115,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, NodeCount> implemen
 
         // 将数据写入 Redis
         String redisData = list2NodeCountMapper.writeValueAsString(re);
-        redisTemplate.opsForValue().set(key, redisData, 30, TimeUnit.MINUTES);
+        redisTemplate.opsForValue().set(key, redisData, 32, TimeUnit.MINUTES);
 
         return re;
     }
