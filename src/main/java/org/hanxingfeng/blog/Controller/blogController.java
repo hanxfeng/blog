@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/blog")
@@ -121,7 +122,7 @@ public class blogController {
      * @return
      */
     @GetMapping("/sumCommit")
-    public R<BigDecimal> sumCommit() {
+    public R<Map> sumCommit() throws JsonProcessingException {
         return R.success(commitCountService.sumCommit());
     }
 }

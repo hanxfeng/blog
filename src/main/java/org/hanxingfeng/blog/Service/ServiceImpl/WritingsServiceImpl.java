@@ -17,6 +17,7 @@ import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -58,12 +59,13 @@ public class WritingsServiceImpl extends ServiceImpl<WritingsMapper, Writings> i
         if (!cache.isEmpty() && cache.containsKey(fieldMeat) && cache.containsKey(fieldContent)) {
             log.info("使用 Redis 获取数据");
             String metaJson = (String) cache.get(fieldMeat);
-            byte[] contentByte = (byte[]) cache.get(fieldContent);
+            // byte[] 经 hashValueSerializer 会被存成 base64 字符串，读回来是 String，需要解码
+            String contentBase64 = (String) cache.get(fieldContent);
             writings = objectMapper.readValue(metaJson, Writings.class);
-            content = ZipUtil.decompress(contentByte);
+            content = ZipUtil.decompress(Base64.getDecoder().decode(contentBase64));
         }
         else {
-            if (cache.get("null").equals("null")) {
+            if (!cache.isEmpty() && cache.get("null").equals("null")) {
                 log.info("返回 null");
                 return null;
             }
@@ -79,8 +81,12 @@ public class WritingsServiceImpl extends ServiceImpl<WritingsMapper, Writings> i
             content = writings.getContent();
         }
 
-        writings.setViewCount(writings.getViewCount() + 1);
-        writingsMapper.updateById(writings);
+        // 只更新点击量
+        Writings viewUpdate = new Writings();
+        viewUpdate.setId(id);
+        viewUpdate.setViewCount(writings.getViewCount() + 1);
+        writingsMapper.updateById(viewUpdate);
+        writings.setViewCount(viewUpdate.getViewCount());
 
         // 写回缓存
         Writings cacheWriting = new Writings();
@@ -91,7 +97,7 @@ public class WritingsServiceImpl extends ServiceImpl<WritingsMapper, Writings> i
 
         Map<String, Object> map = new HashMap<>();
         map.put(fieldMeat, metaJson);
-        map.put(fieldContent, compressedContent);
+        map.put(fieldContent, Base64.getEncoder().encodeToString(compressedContent));
         redisTemplate.opsForHash().putAll(key, map);
         redisTemplate.expire(key, 40, TimeUnit.MINUTES);
 

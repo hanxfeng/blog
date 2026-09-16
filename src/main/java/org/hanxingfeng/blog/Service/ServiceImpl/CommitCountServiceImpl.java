@@ -150,25 +150,28 @@ public class CommitCountServiceImpl extends ServiceImpl<CommitCountMapper, Commi
      * @return 总代码修改行数
      */
     @Override
-    public BigDecimal sumCommit() {
+    public Map sumCommit() throws JsonProcessingException {
         log.info("开始获取总代码修改行数");
 
         String key = "sumCount";
         String redisData = redisTemplate.opsForValue().get(key);
+        Map map;
 
-        BigDecimal re;
         if (redisData == null) {
             QueryWrapper<CommitCount> qw = new QueryWrapper<>();
-            qw.select("SUM(total_changes) as commit_count");
-            Map<String, Object> map = commitCountMapper.selectMaps(qw).get(0);
-            re = (BigDecimal) map.get("commit_count");
-            redisTemplate.opsForValue().set(key, re.toString());
+            qw.select(
+                    "SUM(additions) as additions",
+                    "SUM(deletions) as deletions",
+                    "SUM(total_changes) as total_changes"
+            );
+            map = commitCountMapper.selectMaps(qw).get(0);
+            String stringMap = objectMapper.writeValueAsString(map);
+            redisTemplate.opsForValue().set(key, stringMap, 42, TimeUnit.MINUTES);
         }
         else {
-            re = new BigDecimal(redisData);
-            redisTemplate.opsForValue().set(key, String.valueOf(re));
+            map = objectMapper.readValue(redisData, Map.class);
         }
 
-        return re;
+        return map;
     }
 }

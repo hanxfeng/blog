@@ -377,16 +377,16 @@
         <!-- 左侧统计 -->
         <div class="w-full md:w-1/3 card p-6">
             <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">
-                Yesterday's Code
+                Total Code
             </h3>
             <div class="space-y-6">
                 <div>
-                    <p class="text-3xl font-light" id="yesterday-additions" style="color:#22c55e">0</p>
-                    <p class="text-sm" style="color: var(--text-secondary)">昨日增加代码行数</p>
+                    <p class="text-3xl font-light" id="total-additions" style="color:#22c55e">0</p>
+                    <p class="text-sm" style="color: var(--text-secondary)">总增加代码行数</p>
                 </div>
                 <div>
-                    <p class="text-3xl font-light" id="yesterday-deletions" style="color:#ef4444">0</p>
-                    <p class="text-sm" style="color: var(--text-secondary)">昨日减少代码行数</p>
+                    <p class="text-3xl font-light" id="total-deletions" style="color:#ef4444">0</p>
+                    <p class="text-sm" style="color: var(--text-secondary)">总减少代码行数</p>
                 </div>
                 <div class="text-right">
                     <button onclick="showDetailModal()"
@@ -462,8 +462,12 @@
                 <span class="font-semibold" id="modal-total-words">--</span>
             </div>
             <div class="flex justify-between items-center py-2" style="border-bottom: 1px solid var(--card-border)">
-                <span style="color: var(--text-secondary)">历史代码总数</span>
-                <span class="font-semibold" id="modal-total-code">--</span>
+                <span style="color: var(--text-secondary)">昨日增加代码行数</span>
+                <span class="font-semibold" id="modal-yesterday-additions">--</span>
+            </div>
+            <div class="flex justify-between items-center py-2" style="border-bottom: 1px solid var(--card-border)">
+                <span style="color: var(--text-secondary)">昨日减少代码行数</span>
+                <span class="font-semibold" id="modal-yesterday-deletions">--</span>
             </div>
             <div class="flex justify-between items-center py-2">
                 <span style="color: var(--text-secondary)">今日代码修改字数</span>
@@ -862,18 +866,20 @@
             const yesterdayResult = await resYesterday.json();
             const sumResult = await resSum.json();
 
-            // 左侧统计：昨日增加/减少代码行数
-            if (commitResult.code === 1 && commitResult.data) {
-                document.getElementById("yesterday-additions").innerText = commitResult.data.additions || 0;
-                document.getElementById("yesterday-deletions").innerText = commitResult.data.deletions || 0;
+            // 首页统计：总增加/减少代码行数（来自 sumCommit）
+            if (sumResult.code === 1 && sumResult.data) {
+                document.getElementById("total-additions").innerText = sumResult.data.additions || 0;
+                document.getElementById("total-deletions").innerText = sumResult.data.deletions || 0;
             }
 
-            // 缓存弹窗所需数据
+            // 缓存弹窗所需数据：历史总笔记字数
             if (yesterdayResult.code === 1 && yesterdayResult.data) {
                 detailModalData.totalNoteWordCount = yesterdayResult.data.totalNoteWordCount || 0;
             }
-            if (sumResult.code === 1) {
-                detailModalData.sumCommit = sumResult.data || 0;
+            // 缓存弹窗所需数据：昨日增加/减少代码行数
+            if (commitResult.code === 1 && commitResult.data) {
+                detailModalData.yesterdayAdditions = commitResult.data.additions || 0;
+                detailModalData.yesterdayDeletions = commitResult.data.deletions || 0;
             }
             // 今日代码修改字数：从 selectAllCommit 中找今天的记录
             if (allCommitResult.code === 1 && allCommitResult.data) {
@@ -949,7 +955,8 @@
     // =========================
     function showDetailModal() {
         document.getElementById("modal-total-words").innerText = (detailModalData.totalNoteWordCount || 0).toLocaleString();
-        document.getElementById("modal-total-code").innerText = (detailModalData.sumCommit || 0).toLocaleString();
+        document.getElementById("modal-yesterday-additions").innerText = (detailModalData.yesterdayAdditions || 0).toLocaleString();
+        document.getElementById("modal-yesterday-deletions").innerText = (detailModalData.yesterdayDeletions || 0).toLocaleString();
         document.getElementById("modal-today-code").innerText = (detailModalData.todayCodeChanges || 0).toLocaleString();
         document.getElementById("detail-modal-overlay").classList.add("active");
     }

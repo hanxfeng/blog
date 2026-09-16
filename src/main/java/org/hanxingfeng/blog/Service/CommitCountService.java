@@ -6,6 +6,7 @@ import org.hanxingfeng.blog.Entity.CommitCount;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 public interface CommitCountService extends IService<CommitCount> {
 
@@ -27,5 +28,5 @@ public interface CommitCountService extends IService<CommitCount> {
      * 用于获取总代码修改行数
      * @return 总代码修改行数
      */
-    BigDecimal sumCommit();
+    Map sumCommit() throws JsonProcessingException;
 }
