@@ -75,6 +75,9 @@ public class blogController {
      */
     @GetMapping("/getOne/{id}")
     public R<Writings> getOne(@PathVariable Long id) throws JsonProcessingException {
+        if (id < 0) {
+            return R.error("id 错误");
+        }
         return R.success(writingsService.getWritingsById(id));
     }
 
