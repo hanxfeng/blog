@@ -47,7 +47,7 @@
 | 安全 | Spring Security（仅用 `BCryptPasswordEncoder`）、jjwt 0.11.5、自定义 `HandlerInterceptor` |
 | HTTP 客户端 | WebClient（spring-boot-starter-webflux） |
 | 其他 | Lombok、spring-retry（`flexmark` / `jsoup` 已引入但未使用） |
-| 前端 | 原生 HTML/CSS/JS + Tailwind CDN + markdown-it + highlight.js |
+| 前端 | 原生 HTML/CSS/JS + Tailwind（CDN） + markdown-it / highlight.js / github-markdown-css（已本地化到 `static/vendor`） |
 
 ## 目录结构
 
@@ -72,6 +72,7 @@ blog
     │       ├── application.yaml       # 本地真实配置（已在 .gitignore 中）
     │       ├── application-example.yaml
     │       └── static                 # index.html / node.html / admin.html / imageUpload.html
+    │           └── vendor             # 本地化的前端库（markdown-it / highlight.js / github-markdown-css）
     └── test/java/.../BlogApplicationTests.java   # 手工调试用测试
 ```
 
@@ -279,7 +280,7 @@ curl -X POST http://localhost:8080/admin/login \
 - **分页缓存 key**：`getBriefWritings` 用固定 key `PageSummaryWriting` 缓存，翻页会命中同一份数据；置顶时会删掉它，但删除文章只清单篇缓存，列表缓存仍会残留最多 38 分钟。
 - **鉴权范围**：`SecurityConfig` 目前 `permitAll()`，实际鉴权只靠 `LoginFilter` 拦 `/admin/**`；`/file/upload`、`/file/setImage` 等写接口对外公开，公网部署前建议收紧。
 - **登录限流**：`loginCount` 是全局计数（非按 IP），累计 5 次失败后锁定；登录成功会删除该 key，但失败累加时 Redis TTL 被覆盖，长时间不登录成功理论上会一直锁着。
-- **CDN 依赖**：所有页面从 `cdn.tailwindcss.com`、`cdn.jsdelivr.net` 加载样式与脚本，离线环境页面会裸奔。
+- **CDN 依赖**：`cdn.jsdelivr.net` 在国内经常被重置，导致 `markdown-it` / `highlight.js` 加载失败、整页脚本中断，因此这三个库已本地化到 `static/vendor/`（版本见 `static/vendor/NOTICE.md`）；目前只剩 `cdn.tailwindcss.com` 仍走公网，Tailwind 加载失败只影响样式、不影响功能，需要完全离线时同样可以自托管。
 - **未使用的依赖**：`flexmark`、`jsoup`、`spring-boot-starter-thymeleaf` 已在 `pom.xml` 中引入，但当前代码没有实际使用（Markdown 渲染在前端由 markdown-it 完成）。
 - **目录里的临时产物**：`GithubService.txt`（未启用的草稿）、`test.html` / `admin-test.html`（调试页）、`index备份.html` 不参与主流程。
 - **测试类连真实环境**：`BlogApplicationTests` 是手工调试集合，`@SpringBootTest` 会读 `application.yaml` 连远程 MySQL / Redis，跑 `mvn test` 前务必确认配置指向本地。
